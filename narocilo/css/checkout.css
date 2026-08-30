@@ -142,10 +142,7 @@ svg{display:block}
 .sec-title{text-align:center;font-size:20px;margin:0 0 4px}
 
 /* Ozadje samo na koraku izbire storitve */
-body.bg-choice{background:url("../Slike/Ozadje.jpg") center/cover no-repeat scroll;background-color:#0a3d62}
-body.bg-choice .co-header{background:rgba(255,255,255,.92)}
-body.bg-choice .co-title,body.bg-choice .co-sub{color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.5)}
-body.bg-choice .choice{box-shadow:0 12px 34px rgba(16,24,40,.30)}
+body.bg-choice{background:var(--soft)}
 
 /* ===== Mobilna optimizacija ===== */
 button,.btn,a.btn,.sw,.choice,.plan,.selbtn{-webkit-tap-highlight-color:rgba(0,0,0,.06)}
