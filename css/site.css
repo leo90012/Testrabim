@@ -188,8 +188,9 @@ img{max-width:100%;display:block}
 .ft-logo{height:34px}
 @media(max-width:560px){.brand-logo{height:36px}}
 
-/* Hero slika */
-.hero-card img{max-width:330px}
+/* Hero slika – omejena po višini, razmerje ostane originalno */
+.hero-card img{width:auto;max-width:100%;height:auto;max-height:420px}
+@media(max-width:880px){.hero-card img{max-width:280px;max-height:320px}}
 
 /* Foto pas čez celo širino */
 .photo-band{position:relative;background-size:cover;background-position:center;padding:clamp(72px,12vw,132px) 0;color:#fff;text-align:center}
