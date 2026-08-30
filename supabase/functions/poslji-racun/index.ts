@@ -62,6 +62,12 @@ function b64(bytes: Uint8Array) {
   return btoa(bin);
 }
 function d(dt: Date) { return dt.toISOString().slice(0, 10); }
+// Prikaz datuma v EU obliki (DD. MM. LLLL) iz ISO zapisa.
+function dSi(v: unknown): string {
+  if (!v) return "";
+  const p = String(v).slice(0, 10).split("-");
+  return p.length === 3 ? `${p[2]}. ${p[1]}. ${p[0]}` : String(v);
+}
 
 // Cenik (mora se ujemati s checkout.js)
 function znesekZa(o: any): number {
@@ -127,8 +133,8 @@ async function makePdf(r: any, kupecNaslov: string, predracun: boolean) {
   let my = M + 48;
   const meta = (l: string, v: unknown) => { T(l, M, my, font, 9, gray); T(v, M + 115, my, font, 9, dark); my += 14; };
   meta("Številka", r.stevilka ?? "");
-  meta("Datum izdaje", r.datum_izdaje ?? "");
-  meta("Rok plačila", r.datum_zapadlosti ?? "");
+  meta("Datum izdaje", dSi(r.datum_izdaje));
+  meta("Rok plačila", dSi(r.datum_zapadlosti));
   meta("ID za DDV", FIRMA.ddv);
 
   // Izdajatelj (levo) + Za (desno)
@@ -244,8 +250,8 @@ Deno.serve(async (req) => {
           <p>${uvod}</p>
           <table style="width:100%;border-collapse:collapse;font-size:14px">
             <tr><td style="padding:8px 0;color:#7b8794">Številka</td><td style="text-align:right;font-weight:600">${r.stevilka}</td></tr>
-            <tr><td style="padding:8px 0;color:#7b8794">Datum izdaje</td><td style="text-align:right">${r.datum_izdaje ?? ""}</td></tr>
-            <tr><td style="padding:8px 0;color:#7b8794">Rok plačila</td><td style="text-align:right">${r.datum_zapadlosti ?? ""}</td></tr>
+            <tr><td style="padding:8px 0;color:#7b8794">Datum izdaje</td><td style="text-align:right">${dSi(r.datum_izdaje)}</td></tr>
+            <tr><td style="padding:8px 0;color:#7b8794">Rok plačila</td><td style="text-align:right">${dSi(r.datum_zapadlosti)}</td></tr>
             <tr><td colspan="2" style="border-top:1px solid #e5e8ee;padding-top:8px"></td></tr>
             <tr><td style="padding:6px 0;color:#7b8794">Osnova</td><td style="text-align:right">${eur(Number(r.osnova), r.valuta)}</td></tr>
             <tr><td style="padding:6px 0;color:#7b8794">DDV (22%)</td><td style="text-align:right">${eur(Number(r.ddv), r.valuta)}</td></tr>

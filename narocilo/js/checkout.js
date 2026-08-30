@@ -176,7 +176,7 @@
     function onDate(v){if(v&&isWeekend(v)){alert("Dostave in prevzemi so samo od ponedeljka do petka. Prosim izberi delovni dan.");s.datum="";s.cas="";if(fpi){fpi.clear();}else if(dEl){dEl.value="";}refreshTimes();return;}s.datum=v;s.cas="";refreshTimes();}
     var fpi=null;
     if(window.flatpickr&&dEl){
-      fpi=window.flatpickr(dEl,{minDate:"today",dateFormat:"Y-m-d",disableMobile:true,
+      fpi=window.flatpickr(dEl,{minDate:"today",dateFormat:"Y-m-d",altInput:true,altFormat:"d. m. Y",altInputClass:"",disableMobile:true,
         locale:(window.flatpickr.l10ns&&window.flatpickr.l10ns.sl)?window.flatpickr.l10ns.sl:undefined,
         disable:[function(d){return d.getDay()===0||d.getDay()===6;}],
         defaultDate:s.datum||null,

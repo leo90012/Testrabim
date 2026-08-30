@@ -119,7 +119,7 @@ svg{display:block}
 .btn.block{width:100%}
 .btn:disabled{opacity:.45;cursor:default;box-shadow:none;transform:none}
 .btn:disabled:hover{background:var(--brand);border-color:var(--brand);transform:none;box-shadow:none}
-.nav-btns{display:flex;justify-content:space-between;gap:12px;margin-top:26px}
+.nav-btns{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-top:26px}
 .center{text-align:center}
 
 .alert{padding:11px 13px;border-radius:9px;font-size:13.5px;margin-bottom:14px;border:1px solid transparent}

@@ -32,8 +32,9 @@
     if (!d) return "-";
     const dt = new Date(d);
     if (isNaN(dt)) return esc(d);
-    const opt = wt ? { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "2-digit", year: "numeric" };
-    return dt.toLocaleDateString("sl-SI", opt);
+    const p2 = (n) => String(n).padStart(2, "0");
+    const dan = `${p2(dt.getDate())}. ${p2(dt.getMonth() + 1)}. ${dt.getFullYear()}`;
+    return wt ? `${dan} ${p2(dt.getHours())}:${p2(dt.getMinutes())}` : dan;
   }
   function money(v, cur = "EUR") {
     if (v == null || v === "") return "-";
@@ -483,7 +484,19 @@
       <div class="field"><label>Opomba</label><textarea id="oNote" rows="3" placeholder="Posebnosti, št. boxov, ..."></textarea></div>
       <button class="btn primary" type="submit" id="oSubmit">Naroči vračilo</button>
       <button class="btn ghost mt" type="button" data-close>Prekliči</button></form>`);
-    const de = $("#oDate"); if (de) de.addEventListener("change", loadOrderTimes);
+    const de = $("#oDate");
+    if (de) {
+      if (window.flatpickr) {
+        // Prikaz datuma v EU obliki (DD. MM. LLLL), vrednost ostane ISO.
+        window.flatpickr(de, {
+          minDate: "today", dateFormat: "Y-m-d", altInput: true, altFormat: "d. m. Y", altInputClass: "", disableMobile: true, static: true,
+          locale: (window.flatpickr.l10ns && window.flatpickr.l10ns.sl) ? window.flatpickr.l10ns.sl : undefined,
+          onChange: loadOrderTimes,
+        });
+      } else {
+        de.addEventListener("change", loadOrderTimes);
+      }
+    }
     $("#orderForm").addEventListener("submit", submitOrder);
   }
   async function submitOrder(e) {
