@@ -77,8 +77,8 @@
     v_skladiscu:  { label: "Prevzeto v skladišče", color: "blue" },
     zakljucena:   { label: "Zaključeno",        color: "green" },
     zakljuceno:   { label: "Zaključeno",        color: "green" },
-    preklicana:   { label: "Preklicano",        color: "red" },
-    preklicano:   { label: "Preklicano",        color: "red" },
+    preklicana:   { label: "Preklicano",        color: "gray" },
+    preklicano:   { label: "Preklicano",        color: "gray" },
     // stare vrednosti (za nazaj združljivost)
     potrjena:     { label: "Potrjeno",          color: "blue" },
     potrjeno:     { label: "Potrjeno",          color: "blue" },
@@ -92,23 +92,23 @@
     if (key.includes("nov") || key.includes("caka") || key.includes("čaka")) c = "amber";
     else if (key.includes("obdel") || key.includes("potrj")) c = "blue";
     else if (key.includes("zakljuc") || key.includes("zaključ") || key.includes("dostavlj")) c = "green";
-    else if (key.includes("preklic") || key.includes("zavrn")) c = "red";
+    else if (key.includes("preklic") || key.includes("zavrn")) c = "gray";
     return `<span class="badge ${c}">${esc(s || "nova")}</span>`;
   }
 
   const SUB_STATUS = {
     aktivna:    { label: "Aktivna",    color: "green" },
     pavza:      { label: "Na pavzi",   color: "amber" },
-    neaktivna:  { label: "Neaktivna",  color: "red" },
+    neaktivna:  { label: "Neaktivna",  color: "gray" },
     zakljucena: { label: "Zaključena", color: "gray" },
-    preklicana: { label: "Preklicana", color: "red" },
+    preklicana: { label: "Preklicana", color: "gray" },
   };
   function subStatusBadge(s) {
     const key = String(s || "").toLowerCase();
     const m = SUB_STATUS[key];
     if (m) return `<span class="badge ${m.color}">${esc(m.label)}</span>`;
     let c = "gray";
-    if (key.includes("preklic") || key.includes("potek") || key.includes("neaktiv")) c = "red";
+    if (key.includes("preklic") || key.includes("potek") || key.includes("neaktiv")) c = "gray";
     else if (key.includes("dostav")) c = "amber";
     else if (key.includes("aktiv")) c = "green";
     else if (key.includes("caka") || key.includes("čaka") || key.includes("nov")) c = "amber";
@@ -128,6 +128,9 @@
     return subStatusBadge(k.status_narocnine);
   }
   const render = (h) => { APP.innerHTML = h; };
+  function emptyState(iconKey, title, sub, ctaHtml) {
+    return `<div class="empty-rich"><div class="empty-ic">${ICON[iconKey] || ICON.grid}</div><h3>${esc(title)}</h3><p>${esc(sub)}</p>${ctaHtml || ""}</div>`;
+  }
   const isStorage = (b) => (b.tip_storitve || "").toLowerCase().includes("sklad");
   const cleanLoc = (l) => (l && l !== "NULL" && l !== "EMPTY") ? l : null;
 
@@ -225,7 +228,7 @@
         <div class="side-brand"><img src="${LOGO}" alt="Rabimbox" /></div>
         <div class="side-user">${esc(ime)}<span class="sub">${esc(k.email || "")}</span></div>
         <nav class="side-nav">${NAV.map((t) => `<a href="#" data-tab="${t.id}" class="${state.tab === t.id ? "active" : ""}">${esc(t.label)}</a>`).join("")}</nav>
-        <div class="side-foot"><a href="#" data-logout>Odjava</a></div>
+        <div class="side-foot"><a href="../index.html">← Nazaj na spletno stran</a><a href="#" data-logout>Odjava</a></div>
       </aside>
       <div class="main-col">
         <header class="topbar"><div class="brand"><img src="${LOGO}" alt="Rabimbox" /></div><div class="who">${esc(ime)}</div></header>
@@ -308,7 +311,7 @@
     const subStarted = (state.narocnine || []).some((x) => x.datum_od && String(x.status || "").toLowerCase() === "aktivna");
     const subBadge = subStarted ? subStatusBadge("aktivna") : (neplacani.length ? subStatusBadge("neaktivna") : (ordersAll.length ? subStatusBadge("v dostavi") : subStatusBadge(k.status_narocnine)));
     const parseAmt = (txt) => { if (!txt) return 0; const before = String(txt).split("/mesec")[0]; const nums = before.match(/\d+(?:[.,]\d+)?/g); if (!nums) return 0; const v = parseFloat(nums[nums.length - 1].replace(/\./g, "").replace(",", ".")); return isNaN(v) ? 0 : v; };
-    const badgeUnpaid = `<span style="background:#fdeceb;color:#a01810;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;margin-left:4px">Ni plačano</span>`;
+    const badgeUnpaid = `<span style="background:var(--amber-sf);color:var(--amber);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;margin-left:4px">Ni plačano</span>`;
     const orderLine = (o) => `<label class="row selectable"><input type="checkbox" class="check unpaid-check" value="${o.id}" data-amount="${parseAmt(o.cena_opis)}" data-ref="${esc(o.stevilka || "")}" />
       <span class="main"><span class="t">Naročilo ${esc(o.stevilka || ("#" + o.id))} ${badgeUnpaid}</span>
       <span class="s">${esc(o.paket || "")}${o.cena_opis ? " - " + esc(o.cena_opis) : ""}</span></span></label>`;
@@ -326,7 +329,7 @@
     const group = (title, arr, gkey) => arr.length ? `<div class="section-title">${title} (${arr.length})${gkey === "skl" ? ` <button class="btn outline small" id="selAllSkl" type="button" style="margin-left:8px">Izberi vse v skladišču</button>` : ""}</div><div class="card"${gkey ? ` data-group="${gkey}"` : ""}>${arr.map(rowH).join("")}</div>` : "";
     let boxiSection;
     if (!boxi.length) {
-      boxiSection = `<p class="page-sub">Pregled tvojih boxov in naročnine.</p><div class="empty"><p>Trenutno nimaš aktivnih boxov.</p><button class="btn primary auto mt" id="newOrderEmpty" style="margin:12px auto 0">Naroči dostavo</button></div>`;
+      boxiSection = `<p class="page-sub">Pregled tvojih boxov in naročnine.</p>${emptyState("truck", "Še nimaš aktivnih boxov", "Naroči svoje prve boxe v 2 minutah — dostavimo jih na tvoj naslov.", '<button class="btn primary auto" id="newOrderEmpty" style="margin:16px auto 0">Naroči prve boxe</button>')}`;
     } else if (state.boxView === "skl") {
       boxiSection = `<p class="page-sub">Boxi v skladišču — izberi in oddaj naročilo za dostavo.</p>${group("V skladišču", skl, "skl")}`;
     } else if (state.boxView === "naj") {
@@ -344,11 +347,11 @@
         <div class="kv"><span class="k">Poteče / obnova</span><span class="v">${fmtDate(narocninaDo())}</span></div>
       </div>
       ${boxiSection}
-      <div class="deliver-bar" id="deliverBar"><div class="inner"><button class="btn gray" id="deliverBtn" disabled>Naroči dostavo izbranih</button></div></div>`;
+      <div class="deliver-bar hidden" id="deliverBar"><div class="inner"><button class="btn primary" id="deliverBtn">Naroči dostavo izbranih</button></div></div>`;
   }
   function wireNadzor() {
     const bar = $("#deliverBar"), btn = $("#deliverBtn"), empty = $("#newOrderEmpty");
-    if (empty) empty.addEventListener("click", () => newOrder());
+    if (empty) empty.addEventListener("click", () => { window.location.href = "../narocilo/index.html"; });
     $$(".nchoice[data-view]").forEach((c) => c.addEventListener("click", () => {
       const v = c.getAttribute("data-view");
       state.boxView = (state.boxView === v) ? null : v;
@@ -357,8 +360,8 @@
     const update = () => {
       const sel = $$(".box-check:checked");
       if (!btn) return;
-      if (sel.length) { btn.disabled = false; btn.classList.remove("gray"); btn.classList.add("success"); btn.textContent = `Naroči dostavo izbranih (${sel.length})`; }
-      else { btn.disabled = true; btn.classList.add("gray"); btn.classList.remove("success"); btn.textContent = "Naroči dostavo izbranih"; }
+      if (sel.length) { if (bar) bar.classList.remove("hidden"); btn.disabled = false; btn.textContent = `Naroči dostavo izbranih (${sel.length})`; }
+      else { if (bar) bar.classList.add("hidden"); btn.textContent = "Naroči dostavo izbranih"; }
     };
     $$(".box-check").forEach((c) => c.addEventListener("change", update));
     if (btn) btn.addEventListener("click", () => newOrder($$(".box-check:checked").map((c) => Number(c.value))));
@@ -411,22 +414,43 @@
     try { const { data } = await state.sb.from("narocila").select("*").eq("email", email).order("id", { ascending: false }); orders = (data || []).filter((o) => !((o.status || "").toLowerCase().includes("preklic"))); } catch (e) {}
     let zahteve = [];
     try { const { data } = await q.narocila(); zahteve = data || []; } catch (e) {}
-    const narocilaCard = orders.length ? `<div class="section-title">Moja naročila</div><div class="card">${orders.map(narociloRow).join("")}</div>` : "";
+    state._orders = orders;
+    const filterHtml = orders.length > 1 ? `<div class="seg seg-filter" style="max-width:340px;margin-bottom:12px"><button data-filter="all" class="active">Vsa</button><button data-filter="paid">Plačana</button><button data-filter="unpaid">Neplačana</button></div>` : "";
+    const narocilaCard = orders.length ? `<div class="section-title">Moja naročila</div>${filterHtml}<div class="card">${orders.map(narociloRow).join("")}</div>` : "";
     const zahteveCard = zahteve.length ? `<div class="section-title">Zahteve za dostavo / prevzem</div><div class="card">${zahteve.map(orderRow).join("")}</div>` : "";
-    const prazno = (!orders.length && !zahteve.length) ? `<div class="empty"><p>Še nimaš oddanih naročil.</p></div>` : "";
+    const prazno = (!orders.length && !zahteve.length) ? emptyState("truck", "Še nimaš oddanih naročil", "Ko oddaš naročilo, se bo skupaj s statusom plačila prikazalo tukaj.") : "";
     return `${pageHead("narocila")}<p class="page-sub">Pregled tvojih naročil ter zahtev za dostavo, prevzem in vrnitev boxov.</p>
       <button class="btn primary auto" id="newOrderBtn" style="margin-bottom:16px">Novo naročilo</button>
       ${narocilaCard}${zahteveCard}${prazno}`;
   }
   function narociloRow(o) {
     const paid = o.placano === true;
-    const badge = paid ? `<span class="badge green">Plačano</span>` : `<span class="badge red">Ni plačano</span>`;
+    const badge = paid ? `<span class="badge green">Plačano</span>` : `<span class="badge amber">Ni plačano</span>`;
     const termin = o.datum_dostave ? (fmtDate(o.datum_dostave) + (o.cas_dostave ? " " + o.cas_dostave : "")) : "";
-    return `<div class="row"><span class="ico">${ICON.receipt}</span>
+    return `<div class="row selectable order-row" data-oid="${o.id}" data-paid="${paid ? 1 : 0}"><span class="ico">${ICON.receipt}</span>
       <div class="main"><div class="t">Naročilo ${esc(o.stevilka || ("#" + o.id))} ${badge}</div>
-      <div class="s">${esc(o.paket || "")}${o.cena_opis ? " · " + esc(o.cena_opis) : ""}${termin ? " · Termin: " + esc(termin) : ""}</div></div></div>`;
+      <div class="s">${esc(o.paket || "")}${o.cena_opis ? " · " + esc(o.cena_opis) : ""}${termin ? " · Termin: " + esc(termin) : ""}</div></div>
+      <span class="end"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="M9 6l6 6-6 6"/></svg></span></div>`;
   }
-  function wireNarocila() { const b = $("#newOrderBtn"); if (b) b.addEventListener("click", () => { window.location.href = "../narocilo/index.html"; }); }
+  function openOrderDetails(o) {
+    const paid = o.placano === true;
+    const termin = o.datum_dostave ? (fmtDate(o.datum_dostave) + (o.cas_dostave ? " " + o.cas_dostave : "")) : "-";
+    const rowKV = (k, v) => (v && v !== "-") ? `<div class="kv"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>` : "";
+    openSheet(`<h3>Naročilo ${esc(o.stevilka || ("#" + o.id))}</h3>
+      <div class="kv"><span class="k">Status plačila</span><span class="v">${paid ? '<span class="badge green">Plačano</span>' : '<span class="badge amber">Ni plačano</span>'}</span></div>
+      ${rowKV("Storitev", o.tip)}${rowKV("Paket", o.paket)}${rowKV("Cena", o.cena_opis)}${rowKV("Termin", termin)}
+      ${rowKV("Naslov", o.naslov)}${rowKV("Poštna", o.postna_stevilka)}${rowKV("Mesto", o.mesto)}${rowKV("Telefon", o.telefon)}
+      <div class="rowflex mt"><a class="btn primary" href="../narocilo/index.html">Ponovi naročilo</a><button class="btn outline-2" type="button" data-close>Zapri</button></div>`);
+  }
+  function wireNarocila() {
+    const b = $("#newOrderBtn"); if (b) b.addEventListener("click", () => { window.location.href = "../narocilo/index.html"; });
+    $$(".seg-filter button").forEach((btn) => btn.addEventListener("click", () => {
+      $$(".seg-filter button").forEach((x) => x.classList.remove("active")); btn.classList.add("active");
+      const f = btn.dataset.filter;
+      $$(".order-row").forEach((r) => { const p = r.dataset.paid === "1"; r.style.display = (f === "all" || (f === "paid" && p) || (f === "unpaid" && !p)) ? "" : "none"; });
+    }));
+    $$(".order-row").forEach((r) => r.addEventListener("click", () => { const o = (state._orders || []).find((x) => String(x.id) === r.dataset.oid); if (o) openOrderDetails(o); }));
+  }
   function orderRow(z) {
     return `<div class="row"><span class="ico">${ICON.truck}</span>
       <div class="main"><div class="t">Naročilo #${z.id}${z.brezplacna ? ` <span class="badge green">brezplačno</span>` : ""}</div>
@@ -491,7 +515,7 @@
     } catch { state.hasRacuni = false; }
     let body;
     if (racuni && racuni.length) body = `<div class="section-title">Računi</div><div class="card">${racuni.map(racRow).join("")}</div>`;
-    else if (state.hasRacuni) body = `<div class="empty"><p>Trenutno ni izdanih računov.</p></div>`;
+    else if (state.hasRacuni) body = emptyState("receipt", "Še ni izdanih računov", "Predračuni in računi se prikažejo tukaj takoj po oddaji naročila.");
     else body = `<div class="alert info">Modul za posamezne račune še ni vključen. V bazi lahko dodaš tabelo <code>racuni</code> (SQL je v <code>sql/setup.sql</code>) in računi se bodo samodejno prikazali tukaj.</div><a class="btn outline auto" href="mailto:${esc(CFG.SUPPORT_EMAIL || "")}?subject=Vprašanje%20glede%20računa">Vprašanje glede plačila</a>`;
     return pageHead("racuni") + subCard + body;
   }
@@ -543,7 +567,7 @@
         <div class="field"><label>Kraj</label><input id="p_kraj" value="${esc(k.kraj || "")}" placeholder="Ljubljana" /></div></div>
         <div class="field"><label>E-pošta</label><input value="${esc(k.email || state.session.user.email)}" disabled /><div class="hint">E-naslov je vezan na prijavo in ga tu ni mogoče spremeniti.</div></div>
         <button class="btn primary auto" type="submit" id="profSave">Shrani spremembe</button></form></div>
-      <button class="btn danger auto" id="logoutBtn">Odjava</button>`;
+      <div class="prof-logout"><a href="#" id="logoutBtn">Odjava iz računa</a></div>`;
   }
   function wireProfil() { $("#profForm").addEventListener("submit", saveProfil); $("#logoutBtn").addEventListener("click", doLogout); }
   async function saveProfil(e) {
@@ -555,7 +579,7 @@
     };
     const { error } = await state.sb.from("kupci").update(patch).eq("id", state.kupec.id);
     if (error) { alert("Napaka: " + error.message); btn.disabled = false; btn.textContent = "Shrani spremembe"; return; }
-    Object.assign(state.kupec, patch); toast("Shranjeno"); btn.disabled = false; btn.textContent = "Shrani spremembe";
+    Object.assign(state.kupec, patch); toast("Shranjeno ✓"); btn.disabled = false; btn.textContent = "Shrani spremembe";
   }
 
   function openSheet(html) {

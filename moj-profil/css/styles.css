@@ -15,8 +15,9 @@
   --brand:    #0067ff;   /* rabimbox modra */
   --brand-dk: #0052cc;
   --brand-sf: #e8f0ff;
-  --btn:      #6ec1e4;   /* barva gumbov */
-  --btn-dk:   #54b1d9;   /* gumb hover */
+  --btn:      #0067ff;   /* barva gumbov (poenoteno s wizardom) */
+  --btn-dk:   #0052cc;   /* gumb hover */
+  --accent:   #6ec1e4;   /* sekundarni akcent */
   --green:    #00a32a;   /* rabimbox zelena */
   --green-dk: #018a24;
   --green-sf: #e6f6ea;
@@ -29,8 +30,8 @@
   --shadow-l: 0 10px 30px rgba(16,24,40,.12);
   --sidebar:  264px;
   --maxw:     880px;
-  --font:     "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-h:   "Lexend", var(--font);
+  --font:     "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-h:   "Space Grotesk", var(--font);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -159,8 +160,9 @@ svg { display: block; }
 .badge.red { background: var(--red-sf); color: var(--red); }
 
 /* Gumbi */
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px 18px; border-radius: 3px; border: 1px solid var(--btn); background: var(--btn); color: #fff; font-weight: 600; font-size: 14.5px; transition: background .15s, border-color .15s; }
-.btn:hover { text-decoration: none; background: var(--btn-dk); border-color: var(--btn-dk); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px 18px; border-radius: 10px; border: 1px solid var(--btn); background: var(--btn); color: #fff; font-weight: 600; font-size: 14.5px; box-shadow: 0 8px 20px rgba(0,103,255,.22); transition: background .15s, border-color .15s, transform .15s, box-shadow .15s; will-change: transform; }
+.btn:hover { text-decoration: none; background: var(--btn-dk); border-color: var(--btn-dk); transform: translateY(-1px); box-shadow: 0 12px 26px rgba(0,103,255,.3); }
+.btn:active { transform: scale(.98); }
 .btn.primary { background: var(--btn); border-color: var(--btn); color: #fff; }
 .btn.primary:hover { background: var(--btn-dk); border-color: var(--btn-dk); }
 .btn.success { background: var(--btn); border-color: var(--btn); color: #fff; }
@@ -169,11 +171,15 @@ svg { display: block; }
 .btn.outline:hover { background: var(--btn-dk); border-color: var(--btn-dk); }
 .btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
 .btn.danger:hover { background: #b3241a; border-color: #b3241a; }
-.btn.ghost { background: transparent; border-color: transparent; color: var(--btn); }
-.btn.ghost:hover { background: transparent; border-color: transparent; color: var(--btn-dk); }
-.btn.gray { background: #e9edf2; border-color: #e9edf2; color: #9aa5b4; }
-.btn.gray:hover { background: #e9edf2; border-color: #e9edf2; color: #9aa5b4; }
-.btn:disabled { opacity: .5; cursor: default; }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--btn); box-shadow: none; }
+.btn.ghost:hover { background: transparent; border-color: transparent; color: var(--btn-dk); transform: none; box-shadow: none; }
+.btn.outline-2 { background: #fff; border-color: var(--line); color: var(--heading); box-shadow: none; }
+.btn.outline-2:hover { background: var(--surface-2); color: var(--heading); }
+.btn.gray { background: #e9edf2; border-color: #e9edf2; color: #9aa5b4; box-shadow: none; }
+.btn.gray:hover { background: #e9edf2; border-color: #e9edf2; color: #9aa5b4; transform: none; box-shadow: none; }
+.btn.danger { box-shadow: 0 8px 20px rgba(217,45,32,.2); }
+.btn:disabled { opacity: .45; cursor: default; box-shadow: none; transform: none; }
+.btn:disabled:hover { transform: none; box-shadow: none; }
 .btn.small { width: auto; padding: 8px 14px; font-size: 13px; }
 .btn.auto { width: auto; }
 
@@ -265,3 +271,26 @@ button, .btn, a.btn, .row.selectable, .nchoice, .tab { -webkit-tap-highlight-col
   .select-box input, .check { width: 20px; height: 20px; }
   .page-sub { margin-bottom: 14px; }
 }
+
+/* ===== Design-system dopolnitve (v20260830) ===== */
+/* Bogato prazno stanje */
+.empty-rich { text-align: center; background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius); padding: 40px 22px; }
+.empty-rich .empty-ic { width: 64px; height: 64px; border-radius: 50%; background: var(--brand-sf); color: var(--brand); display: grid; place-items: center; margin: 0 auto 16px; }
+.empty-rich .empty-ic svg { width: 32px; height: 32px; stroke: currentColor; }
+.empty-rich h3 { margin: 0 0 6px; font-size: 18px; color: var(--heading); }
+.empty-rich p { margin: 0 auto; max-width: 42ch; color: var(--muted); font-size: 14px; }
+
+/* Ločena odjava v profilu (ni ob gumbu Shrani) */
+.prof-logout { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 18px; text-align: center; }
+.prof-logout a { color: var(--muted); font-size: 14px; font-weight: 500; }
+.prof-logout a:hover { color: var(--red); text-decoration: none; }
+
+/* Sidebar: dve povezavi v nogi */
+.side-foot a { display: block; padding: 9px 12px; }
+
+/* Filter naročil (segmentni) */
+.seg-filter button.active { color: var(--brand); }
+
+/* Klikabilna vrstica naročila */
+.order-row { cursor: pointer; transition: background .12s; }
+.order-row:hover { background: var(--surface-2); }
