@@ -222,7 +222,7 @@
       kv("Telefon",s.telefon)+
       kv("Termin",fmtDatum(s.datum)+" "+(s.cas||""))+
       '</div>'+summaryCard()+'</div>'+
-      '<label class="terms"><input type="checkbox" id="pz_soglasje" '+(s.soglasje?"checked":"")+' /> <span>Soglašam s <a href="../pravila-in-pogoji/index.html" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>'+
+      '<label class="terms"><input type="checkbox" id="pz_soglasje" '+(s.soglasje?"checked":"")+' /> <span>Soglašam s <a href="../pravila-in-pogoji/" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>'+
       '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button>'+
       '<div class="cta-col"><button class="btn" id="pz_primary" '+(s.soglasje?"":"disabled")+'>'+payLabel+'</button>'+
       '<span class="cta-hint">'+payHint+'</span>'+
@@ -259,7 +259,7 @@
       body.innerHTML='<div class="rowflex"><div class="field"><label>Ime</label><input id="am_ime" value="'+esc(s.ime)+'"/></div><div class="field"><label>Priimek</label><input id="am_priimek" value="'+esc(s.priimek)+'"/></div></div>'+
         '<div class="field"><label>E-pošta</label><input type="email" id="am_email" value="'+esc(s.email)+'" placeholder="ime@primer.si"/></div>'+
         '<div class="field"><label>Geslo</label><input type="password" id="am_geslo" placeholder="vsaj 6 znakov"/></div>'+
-        '<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#7b8794;margin:2px 0 12px"><input type="checkbox" id="am_soglasje"/> <span>Soglašam s <a href="../pravila-in-pogoji/index.html" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>'+
+        '<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#7b8794;margin:2px 0 12px"><input type="checkbox" id="am_soglasje"/> <span>Soglašam s <a href="../pravila-in-pogoji/" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>'+
         '<div id="am_err"></div><button class="btn block" type="button" id="am_go">Ustvari račun in nadaljuj</button>';
       gid("am_go").onclick=doRegister;
     }else{
@@ -343,7 +343,7 @@
       try{ sb.functions.invoke("poslji-obvestilo",{body:{tip:"lastnik_povprasevanje",ime:ime,priimek:priimek,email:email,telefon:tel,paket:planLabel(),vprasanje:vpr}}); }catch(e){}
       render('<div class="done-wrap"><div class="done-check">'+ICON.check+'</div>'+
         '<h1 class="co-title">Hvala!</h1><p class="co-sub">Kontaktirali vas bomo v najkrajšem možnem času. Povzetek smo poslali na vaš e-naslov.</p>'+
-        '<div class="mt"><a class="btn" href="../index.html">Nazaj na domačo stran</a></div></div>');
+        '<div class="mt"><a class="btn" href="../">Nazaj na domačo stran</a></div></div>');
     }catch(e){
       var body=encodeURIComponent("Ime: "+ime+" "+priimek+"\nE-pošta: "+email+"\nTelefon: "+tel+"\nPaket: "+planLabel()+" ("+(s.tip||"")+")\n\nVprašanje:\n"+vpr);
       window.location.href="mailto:info@rabimbox.si?subject="+encodeURIComponent("Povpraševanje – Rabimbox")+"&body="+body;
@@ -382,7 +382,7 @@
       '<div class="field"><label>Priimek</label><input id="priimek" value="'+esc(s.priimek)+'" /></div></div>'+
       '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.email)+'" placeholder="ime@primer.si" /></div>'+
       '<div class="field"><label>Geslo (za dostop do panela)</label><input type="password" id="geslo" value="'+esc(s.geslo||"")+'" placeholder="vsaj 6 znakov" minlength="6" /><div class="hint">Ustvarimo ti račun za spremljanje naročil v panelu Moj račun.</div></div>'+
-      '<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#7b8794;margin:0 0 14px;cursor:pointer"><input type="checkbox" id="soglasje" '+(s.soglasje?"checked":"")+' style="margin-top:2px" /> <span>Soglašam s <a href="../pravila-in-pogoji/index.html" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>'+
+      '<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#7b8794;margin:0 0 14px;cursor:pointer"><input type="checkbox" id="soglasje" '+(s.soglasje?"checked":"")+' style="margin-top:2px" /> <span>Soglašam s <a href="../pravila-in-pogoji/" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>'+
       '<div class="alert info">Po oddaji te preusmerimo na varno plačilo prvega meseca (Stripe).</div>'+
       '</div>'+summaryCard()+'</div>'+
       '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button><button class="btn" id="submit">Plačilo</button></div>');
@@ -463,7 +463,7 @@
       (rc.stevilka?('<div style="border-top:1px solid var(--line);margin:6px 0 2px"></div>'+kv("Račun št.",rc.stevilka)+kv("Osnova",eur(rc.osnova))+kv("DDV (22%)",eur(rc.ddv))+kv("Za plačilo",eur(rc.znesek))+kv("Rok plačila",rc.zapStr)):"")+
       '</div>'+
       (s.emailSent?'':'<p class="muted" style="font-size:12.5px;margin-top:10px">Račun je shranjen; e-pošto s podatki pošljemo po potrditvi.</p>')+
-      '<div class="mt"><a class="btn" href="../index.html">Nazaj na domačo stran</a></div></div>');
+      '<div class="mt"><a class="btn" href="../">Nazaj na domačo stran</a></div></div>');
   }
 
   function znesekZaNarocilo(o){
@@ -496,14 +496,14 @@
     render('<div class="done-wrap"><div class="done-check">'+ICON.check+'</div>'+
       '<h1 class="co-title">Plačilo uspešno!</h1>'+
       '<p class="co-sub">Hvala za naročilo. Račun ti pošljemo na e-pošto.'+(ref?' Številka naročila: <b>'+esc(ref)+'</b>.':'')+' Kmalu te pokličemo za potrditev termina.</p>'+
-      '<div class="mt"><a class="btn" href="../index.html">Nazaj na domačo stran</a> <a class="btn ghost" href="../moj-profil/">Moj račun</a></div></div>');
+      '<div class="mt"><a class="btn" href="../">Nazaj na domačo stran</a> <a class="btn ghost" href="../moj-profil/">Moj račun</a></div></div>');
     potrdiPlacilo(ref);
   }
   function viewPlacanoPreklic(ref){
     render('<div class="done-wrap">'+
       '<h1 class="co-title">Plačilo preklicano</h1>'+
       '<p class="co-sub">Plačilo ni bilo dokončano, zato naročilo ni potrjeno. Lahko poskusiš znova.</p>'+
-      '<div class="mt"><a class="btn" href="index.html">Nazaj na naročilo</a> <a class="btn ghost" href="../index.html">Domov</a></div></div>');
+      '<div class="mt"><a class="btn" href="./">Nazaj na naročilo</a> <a class="btn ghost" href="../">Domov</a></div></div>');
   }
 
   function infoBlock(){

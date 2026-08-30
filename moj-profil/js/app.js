@@ -152,7 +152,7 @@
         <form id="authForm">
           <div class="field"><label>E-poštni naslov</label><input type="email" id="email" autocomplete="email" required placeholder="ime@primer.si" />${isReg ? `<div class="hint">Uporabi isti e-naslov, ki ga imaš v evidenci Rabimbox.</div>` : ""}</div>
           ${!isMagic ? `<div class="field"><label>Geslo</label><input type="password" id="password" autocomplete="${isReg ? "new-password" : "current-password"}" required minlength="6" placeholder="********" /></div>` : `<div class="hint" style="margin-bottom:14px">Poslali ti bomo povezavo za prijavo brez gesla.</div>`}
-          ${isReg ? `<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#7b8794;margin:2px 0 14px;cursor:pointer"><input type="checkbox" id="agree" style="margin-top:2px" /> <span>Soglašam s <a href="../pravila-in-pogoji/index.html" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>` : ""}
+          ${isReg ? `<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#7b8794;margin:2px 0 14px;cursor:pointer"><input type="checkbox" id="agree" style="margin-top:2px" /> <span>Soglašam s <a href="../pravila-in-pogoji/" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>` : ""}
           <button class="btn primary" type="submit" id="authBtn">${isMagic ? "Pošlji povezavo" : isReg ? "Ustvari račun" : "Prijava"}</button>
         </form>
         ${mode === "login" ? `<button class="btn ghost mt" id="forgot">Pozabljeno geslo?</button>` : ""}
@@ -228,7 +228,7 @@
         <div class="side-brand"><img src="${LOGO}" alt="Rabimbox" /></div>
         <div class="side-user">${esc(ime)}<span class="sub">${esc(k.email || "")}</span></div>
         <nav class="side-nav">${NAV.map((t) => `<a href="#" data-tab="${t.id}" class="${state.tab === t.id ? "active" : ""}">${esc(t.label)}</a>`).join("")}</nav>
-        <div class="side-foot"><a href="../index.html">← Nazaj na spletno stran</a><a href="#" data-logout>Odjava</a></div>
+        <div class="side-foot"><a href="../">← Nazaj na spletno stran</a><a href="#" data-logout>Odjava</a></div>
       </aside>
       <div class="main-col">
         <header class="topbar"><div class="brand"><img src="${LOGO}" alt="Rabimbox" /></div><div class="who">${esc(ime)}</div></header>
@@ -351,7 +351,7 @@
   }
   function wireNadzor() {
     const bar = $("#deliverBar"), btn = $("#deliverBtn"), empty = $("#newOrderEmpty");
-    if (empty) empty.addEventListener("click", () => { window.location.href = "../narocilo/index.html"; });
+    if (empty) empty.addEventListener("click", () => { window.location.href = "../narocilo/"; });
     $$(".nchoice[data-view]").forEach((c) => c.addEventListener("click", () => {
       const v = c.getAttribute("data-view");
       state.boxView = (state.boxView === v) ? null : v;
@@ -440,10 +440,10 @@
       <div class="kv"><span class="k">Status plačila</span><span class="v">${paid ? '<span class="badge green">Plačano</span>' : '<span class="badge amber">Ni plačano</span>'}</span></div>
       ${rowKV("Storitev", o.tip)}${rowKV("Paket", o.paket)}${rowKV("Cena", o.cena_opis)}${rowKV("Termin", termin)}
       ${rowKV("Naslov", o.naslov)}${rowKV("Poštna", o.postna_stevilka)}${rowKV("Mesto", o.mesto)}${rowKV("Telefon", o.telefon)}
-      <div class="rowflex mt"><a class="btn primary" href="../narocilo/index.html">Ponovi naročilo</a><button class="btn outline-2" type="button" data-close>Zapri</button></div>`);
+      <div class="rowflex mt"><a class="btn primary" href="../narocilo/">Ponovi naročilo</a><button class="btn outline-2" type="button" data-close>Zapri</button></div>`);
   }
   function wireNarocila() {
-    const b = $("#newOrderBtn"); if (b) b.addEventListener("click", () => { window.location.href = "../narocilo/index.html"; });
+    const b = $("#newOrderBtn"); if (b) b.addEventListener("click", () => { window.location.href = "../narocilo/"; });
     $$(".seg-filter button").forEach((btn) => btn.addEventListener("click", () => {
       $$(".seg-filter button").forEach((x) => x.classList.remove("active")); btn.classList.add("active");
       const f = btn.dataset.filter;
