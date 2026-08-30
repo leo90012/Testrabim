@@ -156,18 +156,18 @@ async function makePdf(r: any, kupecNaslov: string, predracun: boolean) {
   ay += 30;
 
   // Tabela postavk
-  const cQty = 380, cUnit = 470, cTax = 515, cAmt = width - M;
-  T("Opis", M, ay, font, 8.5, gray);
-  R("Kol.", cQty, ay, font, 8.5, gray);
-  R("Cena/enoto", cUnit, ay, font, 8.5, gray);
-  R("DDV", cTax, ay, font, 8.5, gray);
-  R("Znesek", cAmt, ay, font, 8.5, gray);
-  ay += 6; HR(ay); ay += 18;
-  T(r.opis ?? "Storitev", M, ay, font, 10, dark);
-  R("1", cQty, ay, font, 10, dark);
-  R(eur(osnova, cur), cUnit, ay, font, 10, dark);
-  R("22%", cTax, ay, font, 10, dark);
-  R(eur(osnova, cur), cAmt, ay, font, 10, dark);
+  const cQty = 340, cUnit = 432, cTax = 488, cAmt = width - M;
+  T("Opis", M, ay, font, 8, gray);
+  R("Kol.", cQty, ay, font, 8, gray);
+  R("Cena/enoto", cUnit, ay, font, 8, gray);
+  R("DDV", cTax, ay, font, 8, gray);
+  R("Znesek", cAmt, ay, font, 8, gray);
+  ay += 6; HR(ay); ay += 17;
+  T(r.opis ?? "Storitev", M, ay, font, 9, dark);
+  R("1", cQty, ay, font, 9, dark);
+  R(eur(osnova, cur), cUnit, ay, font, 9, dark);
+  R("22%", cTax, ay, font, 9, dark);
+  R(eur(osnova, cur), cAmt, ay, font, 9, dark);
   ay += 14; HR(ay); ay += 18;
 
   // Seštevki (desno)

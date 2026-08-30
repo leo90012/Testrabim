@@ -214,3 +214,24 @@ img{max-width:100%;display:block}
 /* Foto v koraku (kako deluje) */
 .step .ic.ic-photo{padding:0;overflow:hidden}
 .step .ic.ic-photo img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* ===== Sekciji s fotografskim ozadjem (v20260830c) ===== */
+.svc-bg,.feats-bg{position:relative;background-size:cover;background-position:center}
+.svc-bg::before{content:"";position:absolute;inset:0;background:rgba(9,20,45,.66)}
+.feats-bg::before{content:"";position:absolute;inset:0;background:rgba(9,20,45,.6)}
+.svc-bg > .container,.feats-bg > .container{position:relative;z-index:1}
+.svc-bg .sec-head .h2,.feats-bg .sec-head .h2{color:#fff}
+.svc-bg .sec-head .eyebrow,.feats-bg .sec-head .eyebrow{color:var(--accent)}
+/* Značilnosti na fotografiji – belo besedilo */
+.feats-bg .feat h3{color:#fff}
+.feats-bg .feat p{color:rgba(255,255,255,.86)}
+.feats-bg .feat .ic{background:rgba(255,255,255,.15);color:#fff}
+
+/* ===== Blog članek (v20260830d) ===== */
+.article{max-width:760px;margin:0 auto}
+.article p{color:var(--ink);font-size:16.5px;line-height:1.8;margin:0 0 18px}
+.article h2{font-family:var(--f-head);font-size:23px;color:var(--navy);margin:34px 0 12px}
+.article ul{margin:0 0 20px;padding:0;list-style:none}
+.article li{position:relative;padding-left:26px;margin-bottom:10px;color:var(--ink);line-height:1.7}
+.article li::before{content:"";position:absolute;left:3px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.article-back{display:inline-flex;align-items:center;gap:6px;color:var(--navy);font-weight:600;font-size:14.5px;margin-bottom:8px}
