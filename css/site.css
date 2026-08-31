@@ -12,6 +12,8 @@ body{margin:0;font-family:var(--f-body);color:var(--ink);background:var(--bg);li
 h1,h2,h3{font-family:var(--f-head);font-weight:700;line-height:1.15;margin:0;letter-spacing:-.01em}
 a{color:inherit;text-decoration:none}
 img{max-width:100%;display:block}
+/* Ikone so risane s potezo; brez tega je stroke privzeto none in ikona nevidna. */
+svg[stroke-width]{stroke:currentColor}
 .container{max-width:var(--container);margin:0 auto;padding:0 22px}
 .section{padding:var(--sp) 0}
 .bg-alt{background:var(--bg-alt)}
