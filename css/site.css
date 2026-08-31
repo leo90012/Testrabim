@@ -155,10 +155,10 @@ img{max-width:100%;display:block}
 
 /* CTA band */
 .cta-band{background:linear-gradient(135deg,#0052cc,#3b86ff);color:#fff;border-radius:24px;padding:clamp(36px,6vw,64px);text-align:center;position:relative;overflow:hidden}
-.cta-band::after{content:"";position:absolute;inset:0;background:radial-gradient(600px 300px at 20% 120%,rgba(110,193,228,.3),transparent 60%)}
-.cta-band h2{position:relative;font-size:clamp(24px,3.5vw,36px);margin-bottom:10px}
-.cta-band p{position:relative;color:rgba(255,255,255,.85);margin:0 auto 24px;max-width:52ch}
-.cta-band .btn{position:relative}
+.cta-band::after{content:"";position:absolute;inset:0;background:radial-gradient(600px 300px at 20% 120%,rgba(110,193,228,.3),transparent 60%);pointer-events:none}
+.cta-band h2{position:relative;z-index:1;font-size:clamp(24px,3.5vw,36px);margin-bottom:10px}
+.cta-band p{position:relative;z-index:1;color:rgba(255,255,255,.85);margin:0 auto 24px;max-width:52ch}
+.cta-band .btn{position:relative;z-index:1}
 
 /* Footer */
 .ft{background:#0c1830;color:#c7d0de;padding:56px 0 30px}
