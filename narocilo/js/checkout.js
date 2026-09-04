@@ -21,7 +21,7 @@
   var STEPS=[["paketi","Paketi"],["termin","Termin"],["povzetek","Povzetek"]];
 
   var s={step:"choice",tip:null,plan:null,stBoxov:null,extras:{stopnice:false,krhko:false,pomoc:false,dvigalo:false},
-    opis:"",nadstropje:"",naslov:"",enota:"",postna:"",mesto:"",telefon:"",datum:"",cas:"",ime:"",priimek:"",email:"",geslo:"",racunMode:"novo",soglasje:false,loggedIn:false,loginHint:false};
+    opis:"",nadstropje:"",naslov:"",enota:"",postna:"",mesto:"",telefon:"",datum:"",cas:"",ime:"",priimek:"",email:"",geslo:"",racunMode:"novo",soglasje:false,loggedIn:false,loginHint:false,kontaktBack:null,kontaktZadeva:""};
 
   var LJ_POSTE=["1000","1210","1211","1215","1231","1235","1236","1260","1261","1262","1290","1291","1292","1293","1294","1295","1296","1351","1354","1355","1356","1357","1358","1360","1370"];
 
@@ -68,7 +68,7 @@
     var izp=s.tip==="izposoja";
     var arr=izp?IZP:SKL;
     var cards=arr.map(function(p){
-      if(p.contact){var subj="Povpraševanje – "+(izp?"izposoja":"skladiščenje")+" "+p.naziv;return '<div class="plan contact" data-plan="'+p.id+'"><div class="pt">'+esc(p.naziv)+'</div><div class="pp" style="font-size:18px">Po dogovoru</div><div class="pu">ponudba po meri</div><a class="btn small ghost" href="mailto:'+esc(CFG.SUPPORT_EMAIL||"info@rabimbox.si")+'?subject='+encodeURIComponent(subj)+'" style="text-decoration:none">Kontaktiraj nas</a></div>';}
+      if(p.contact){return '<div class="plan contact" data-plan="'+p.id+'"><div class="pt">'+esc(p.naziv)+'</div><div class="pp" style="font-size:18px">Po dogovoru</div><div class="pu">ponudba po meri</div><button type="button" class="btn small ghost pv-contact" data-naziv="'+esc(p.naziv)+'">Kontaktiraj nas</button></div>';}
       var isSel=s.plan===p.id;var sel=isSel?" sel":"";
       var price=izp?eur(p.cena):eur(p.perBox);
       var unit=izp?"za obdobje najema":"na box / mesec";
@@ -84,6 +84,7 @@
       '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button><button class="btn" id="next" '+(canNextPaketi()?"":"disabled")+'>Naprej</button></div>'+
       infoBlock());
     q$all("[data-back]").forEach(function(b){b.onclick=function(){s.step="choice";route();};});
+    q$all(".pv-contact").forEach(function(b){b.onclick=function(){s.kontaktBack="paketi";s.kontaktZadeva="Povpraševanje – "+(izp?"izposoja":"skladiščenje")+" "+b.getAttribute("data-naziv");s.step="povprasevanje";route();};});
     q$all(".selbtn").forEach(function(b){b.onclick=function(){var id=b.getAttribute("data-id");if(s.tip==="izposoja"){s.plan=id;route();setTimeout(function(){var n=q$("#next");if(n){try{n.scrollIntoView({behavior:"smooth",block:"center"});}catch(_){}}} ,60);return;}var pl=null;SKL.forEach(function(x){if(x.id===id)pl=x;});if(pl&&pl.min){s.stBoxov=pl.min;s.plan=id;}route();setTimeout(function(){var el=q$("#stBoxov");if(el){try{el.scrollIntoView({behavior:"smooth",block:"center"});}catch(_){}try{el.focus();el.select();}catch(_){}var c=el.closest(".card");if(c){c.classList.add("rb-flash");setTimeout(function(){c.classList.remove("rb-flash");},1100);}}},70);}});
     var bx=q$("#stBoxov");if(bx){bx.oninput=function(){var v=parseInt(bx.value,10);s.stBoxov=(isNaN(v)||v<1)?null:v;syncSklPlan();var c=q$("#cenaCalc");if(c)c.innerHTML=calcText();q$all(".plan").forEach(function(el){el.classList.toggle("sel",!!s.plan&&el.getAttribute("data-plan")===s.plan);});var n=q$("#next");if(n)n.disabled=!canNextPaketi();};}
     var nb=q$("#next");if(nb)nb.onclick=function(){if(canNextPaketi()){s.step="termin";route();}};
@@ -127,12 +128,13 @@
     var ok=ljAllowed();
     return '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button>'+
       (ok?'<button class="btn" id="next">Naprej</button>'
-         :'<a class="btn" href="mailto:info@rabimbox.si?subject='+encodeURIComponent("Povpraševanje – dostava izven Ljubljane")+'">Kontaktiraj nas</a>')+
+         :'<button type="button" class="btn" id="terminContact">Kontaktiraj nas</button>')+
       '</div>'+
       (ok?'':'<p class="muted" style="text-align:center;font-size:13px;margin-top:10px">Online naročilo je trenutno možno samo za stranke v Ljubljani in okolici. Za druge lokacije nas kontaktirajte.</p>');
   }
   function bindTerminNav(){
     q$all("[data-back]").forEach(function(b){b.onclick=function(){s.step="paketi";route();};});
+    var tc=q$("#terminContact");if(tc)tc.onclick=function(){s.kontaktBack="termin";s.kontaktZadeva="Povpraševanje – dostava izven Ljubljane";s.step="povprasevanje";route();};
     var nb=q$("#next");
     if(nb)nb.onclick=function(){
       if(!s.ime||!s.priimek||!s.naslov||!s.postna||!s.mesto||!s.telefon){alert("Prosim izpolni ime, priimek, naslov, poštno številko, mesto in telefon.");return;}
@@ -319,12 +321,12 @@
       '<div class="field"><label>Priimek</label><input id="pv_priimek" value="'+esc(s.priimek)+'" /></div></div>'+
       '<div class="field"><label>E-pošta</label><input type="email" id="pv_email" value="'+esc(s.email)+'" placeholder="ime@primer.si" /></div>'+
       '<div class="field"><label>Telefon</label><input id="pv_telefon" value="'+esc(s.telefon)+'" placeholder="+386..." /></div>'+
-      '<div class="field"><label>Vprašanje</label><textarea id="pv_vprasanje" rows="4" placeholder="Kako vam lahko pomagamo?"></textarea></div>'+
+      '<div class="field"><label>Vprašanje</label><textarea id="pv_vprasanje" rows="4" placeholder="Kako vam lahko pomagamo?">'+esc(s.kontaktZadeva||"")+'</textarea></div>'+
       '<input type="text" id="hp_pv" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0" /><div id="pv_err"></div>'+
       '<div class="alert info" style="margin:14px 0 0">Ali nas kontaktirajte neposredno na tel. ali e-pošto:<br><a href="tel:+38640796040" style="font-weight:600">+386 (0)40 796 040</a> · <a href="mailto:info@rabimbox.si" style="font-weight:600">info@rabimbox.si</a></div>'+
       '</div>'+
       '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button><button class="btn" id="pvSend">Pošlji povpraševanje</button></div>');
-    q$all("[data-back]").forEach(function(b){b.onclick=function(){s.step="povzetek";route();};});
+    q$all("[data-back]").forEach(function(b){b.onclick=function(){if(s.kontaktBack==="home"){window.location.href="../";return;}if(s.kontaktBack==="paketi"){s.step="paketi";route();return;}if(s.kontaktBack==="termin"){s.step="termin";route();return;}s.step="povzetek";route();};});
     q$("#pvSend").onclick=submitPovprasevanje;
   }
   async function submitPovprasevanje(){
@@ -569,6 +571,7 @@
     });
   }
   var _qp=new URLSearchParams(location.search);var _pl=_qp.get("placilo");
+  if(_qp.get("povprasevanje")==="1"){s.step="povprasevanje";s.kontaktBack="home";var _z=_qp.get("zadeva");s.kontaktZadeva=_z||(s.tip?("Povpraševanje glede "+(s.tip==="izposoja"?"izposoje":"skladiščenja")):"");}
   if(!sb){render('<div class="alert err" style="max-width:520px;margin:40px auto">Ni bilo mogoče naložiti Supabase. Preveri internetno povezavo in js/config.js.</div>');}
   else if(_pl==="uspeh"){ viewPlacanoUspeh(_qp.get("ref")); }
   else if(_pl==="preklic"){ viewPlacanoPreklic(_qp.get("ref")); }
