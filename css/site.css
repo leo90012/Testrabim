@@ -252,3 +252,6 @@ svg[stroke-width]{stroke:currentColor}
 .prow .pv{font-weight:700;color:var(--navy);white-space:nowrap}
 .prow .pv.ok{color:#12a150}
 .prow .pv.ask{color:var(--muted);font-weight:600}
+
+/* Podnaslov (lead) berljiv na fotografskem ozadju sekcije */
+.svc-bg .sec-head .lead,.feats-bg .sec-head .lead{color:rgba(255,255,255,.85)}
