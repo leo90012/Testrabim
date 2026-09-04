@@ -255,3 +255,8 @@ svg[stroke-width]{stroke:currentColor}
 
 /* Podnaslov (lead) berljiv na fotografskem ozadju sekcije */
 .svc-bg .sec-head .lead,.feats-bg .sec-head .lead{color:rgba(255,255,255,.85)}
+
+/* Kartice paketov: enotno centriranje + gumb poravnan na dno (moder = kot ghost) */
+.pc{display:flex;flex-direction:column;align-items:center}
+.pc h3,.pc .amt,.pc .desc{width:100%}
+.pc .btn{margin-top:auto;align-self:center}
