@@ -238,3 +238,16 @@ svg[stroke-width]{stroke:currentColor}
 .article li{position:relative;padding-left:26px;margin-bottom:10px;color:var(--ink);line-height:1.7}
 .article li::before{content:"";position:absolute;left:3px;top:10px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
 .article-back{display:inline-flex;align-items:center;gap:6px;color:var(--navy);font-weight:600;font-size:14.5px;margin-bottom:8px}
+
+/* ===== Cenik – vključeno/doplačila + ostale cene (v20260904) ===== */
+.incl-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px;max-width:920px;margin:0 auto}
+@media(max-width:720px){.incl-grid{grid-template-columns:1fr}}
+.incl-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:26px 26px 12px;box-shadow:var(--shadow)}
+.incl-card h3{font-size:18px;margin-bottom:8px;display:flex;align-items:center;gap:9px}
+.incl-card h3 svg{width:22px;height:22px;flex:0 0 auto}
+.prow{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
+.prow:last-child{border-bottom:0}
+.prow .pk{color:var(--ink)}
+.prow .pv{font-weight:700;color:var(--navy);white-space:nowrap}
+.prow .pv.ok{color:#12a150}
+.prow .pv.ask{color:var(--muted);font-weight:600}

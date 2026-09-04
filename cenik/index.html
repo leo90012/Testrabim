@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-K2DPDNCX');</script>
-<link rel="stylesheet" href="../css/site.css?v=5" />
+<link rel="stylesheet" href="../css/site.css?v=6" />
 </head>
 <body>
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K2DPDNCX" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
@@ -47,12 +47,12 @@
       <h2 class="h2">Mesečna cena na box</h2>
       <p class="lead">Cena na box pade z večjim številom boxov. Minimalno obdobje 1 mesec.</p>
     </div>
-    <div class="price-grid">
+    <div class="price-grid" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));max-width:980px">
       <div class="pc reveal"><h3>1–10 boxov</h3><div class="amt">3,90 €<span> / box</span></div><div class="desc">mesečno</div><a class="btn btn-ghost dark" href="../narocilo/">Naroči</a></div>
       <div class="pc feat reveal" style="transition-delay:.08s"><div class="tag">Najbolj priljubljeno</div><h3>11–25 boxov</h3><div class="amt">3,60 €<span> / box</span></div><div class="desc">mesečno</div><a class="btn btn-primary" href="../narocilo/">Naroči</a></div>
       <div class="pc reveal" style="transition-delay:.16s"><h3>26–50 boxov</h3><div class="amt">3,30 €<span> / box</span></div><div class="desc">mesečno</div><a class="btn btn-ghost dark" href="../narocilo/">Naroči</a></div>
+      <div class="pc reveal" style="transition-delay:.24s"><h3>Nad 50 boxov</h3><div class="amt" style="font-size:28px">Po meri</div><div class="desc">ponudba po meri</div><a class="btn btn-ghost dark" href="mailto:info@rabimbox.si?subject=Ponudba%20po%20meri%20%E2%80%93%20skladi%C5%A1%C4%8Denje">Pridobi ponudbo</a></div>
     </div>
-    <p class="price-note">Nad 50 boxov — <a href="mailto:info@rabimbox.si" style="color:var(--navy);font-weight:600">ponudba po meri</a>.</p>
   </div>
 </section>
 
@@ -63,17 +63,45 @@
       <h2 class="h2">Paketi za selitev</h2>
       <p class="lead">Cene veljajo za najem do 30 dni. Dostava in prevzem vključena.</p>
     </div>
-    <div class="price-grid" style="max-width:1000px;grid-template-columns:repeat(4,1fr)">
-      <div class="pc reveal"><h3>Do 20 boxov</h3><div class="amt">49 €<span></span></div><div class="desc">za obdobje najema</div><a class="btn btn-ghost dark" href="../narocilo/">Naroči</a></div>
-      <div class="pc feat reveal" style="transition-delay:.08s"><div class="tag">Priljubljeno</div><h3>Do 40 boxov</h3><div class="amt">89 €<span></span></div><div class="desc">za obdobje najema</div><a class="btn btn-primary" href="../narocilo/">Naroči</a></div>
-      <div class="pc reveal" style="transition-delay:.16s"><h3>Do 60 boxov</h3><div class="amt">119 €<span></span></div><div class="desc">za obdobje najema</div><a class="btn btn-ghost dark" href="../narocilo/">Naroči</a></div>
-      <div class="pc reveal" style="transition-delay:.24s"><h3>Do 80 boxov</h3><div class="amt">149 €<span></span></div><div class="desc">za obdobje najema</div><a class="btn btn-ghost dark" href="../narocilo/">Naroči</a></div>
+    <div class="price-grid" style="max-width:1120px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr))">
+      <div class="pc reveal"><h3>Do 20 boxov</h3><div class="amt">49 €</div><div class="desc">mesečno</div><a class="btn btn-ghost dark" href="../narocilo/">Naroči</a></div>
+      <div class="pc feat reveal" style="transition-delay:.08s"><div class="tag">Priljubljeno</div><h3>Do 40 boxov</h3><div class="amt">89 €</div><div class="desc">mesečno</div><a class="btn btn-primary" href="../narocilo/">Naroči</a></div>
+      <div class="pc reveal" style="transition-delay:.16s"><h3>Do 60 boxov</h3><div class="amt">119 €</div><div class="desc">mesečno</div><a class="btn btn-ghost dark" href="../narocilo/">Naroči</a></div>
+      <div class="pc reveal" style="transition-delay:.24s"><h3>Do 80 boxov</h3><div class="amt">149 €</div><div class="desc">mesečno</div><a class="btn btn-ghost dark" href="../narocilo/">Naroči</a></div>
+      <div class="pc reveal" style="transition-delay:.32s"><h3>Nad 80 boxov</h3><div class="amt" style="font-size:28px">Po meri</div><div class="desc">ponudba po meri</div><a class="btn btn-ghost dark" href="mailto:info@rabimbox.si?subject=Ponudba%20po%20meri%20%E2%80%93%20izposoja">Pridobi ponudbo</a></div>
     </div>
-    <p class="price-note">Nad 80 boxov — <a href="mailto:info@rabimbox.si" style="color:var(--navy);font-weight:600">ponudba po meri</a>.</p>
   </div>
 </section>
 
 <section class="section">
+  <div class="container">
+    <div class="sec-head center reveal">
+      <span class="eyebrow">Prevozi in doplačila</span>
+      <h2 class="h2">Prevozi, manipulacija in ostale cene</h2>
+      <p class="lead">Cenik prevozov velja za območje Ljubljane. Prevozi po Sloveniji in tujini po dogovoru.</p>
+    </div>
+    <div class="incl-grid">
+      <div class="incl-card reveal">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--navy)"><path d="M3 6h11v9H3z"/><path d="M14 9h3.5L21 12.5V15h-7z"/><circle cx="7" cy="18" r="1.7"/><circle cx="17.5" cy="18" r="1.7"/></svg> Prevozi in manipulacija</h3>
+        <div class="prow"><span class="pk">1× prevzem in 1× vračilo</span><span class="pv ok">Brezplačno</span></div>
+        <div class="prow"><span class="pk">Vsak dodatni prevoz</span><span class="pv">15,00 €</span></div>
+        <div class="prow"><span class="pk">Prevozi po Sloveniji in tujini</span><span class="pv ask">Po dogovoru</span></div>
+        <div class="prow"><span class="pk">Pomoč pri polnjenju boxov</span><span class="pv">25,00 € / h</span></div>
+        <div class="prow"><span class="pk">Zaščitne embalaže (folije)</span><span class="pv ask">Po dogovoru</span></div>
+      </div>
+      <div class="incl-card reveal" style="transition-delay:.08s">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--navy)"><path d="M21 8l-9-4-9 4v8l9 4 9-4V8z"/><path d="M3 8l9 4 9-4M12 12v8"/></svg> Ostale cene</h3>
+        <div class="prow"><span class="pk">Stvari, prevelike za box</span><span class="pv ask">Po dogovoru</span></div>
+        <div class="prow"><span class="pk">Izgubljen box</span><span class="pv">40,00 €</span></div>
+        <div class="prow"><span class="pk">Poškodovan / uničen box</span><span class="pv">40,00 €</span></div>
+        <div class="prow"><span class="pk">Nakup boxa</span><span class="pv ask">Po dogovoru</span></div>
+      </div>
+    </div>
+    <p class="price-note">V ceno je vključen DDV · veljavnost cenika od 1. 1. 2026.</p>
+  </div>
+</section>
+
+<section class="section bg-alt">
   <div class="container">
     <div class="sec-head center reveal">
       <h2 class="h2">Dobro je vedeti</h2>
