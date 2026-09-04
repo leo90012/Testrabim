@@ -111,7 +111,7 @@ svg[stroke-width]{stroke:currentColor}
 .pc:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
 .pc.feat{border-color:var(--navy);box-shadow:0 0 0 3px rgba(0,103,255,.1),var(--shadow)}
 .pc .tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;font-size:11px;font-weight:600;letter-spacing:.02em;line-height:1;white-space:nowrap;padding:5px 12px;border-radius:20px;box-shadow:0 4px 10px rgba(0,103,255,.28)}
-.pc.feat{padding-top:34px}
+.pc.feat{padding-top:34px;text-align:center}
 .pc h3{font-size:17px;color:var(--muted);font-weight:600;font-family:var(--f-body)}
 .pc .amt{font-family:var(--f-head);font-weight:700;font-size:38px;color:var(--ink);margin:6px 0 2px}
 .pc .amt span{font-size:15px;color:var(--muted);font-weight:600}
