@@ -323,7 +323,7 @@
     </div>` : "";
     const skl = boxi.filter(isStorage), naj = boxi.filter((b) => !isStorage(b));
     const aktivna = narocila.filter((z) => { const s = (z.status || "").toLowerCase(); return !s.includes("zakljuc") && !s.includes("zaključ") && !s.includes("preklic") && !s.includes("dostavlj"); }).length;
-    const rowH = (b) => `<label class="row selectable"><input type="checkbox" class="check box-check" value="${b.id}" />
+    const rowH = (b) => `<label class="row selectable"><input type="checkbox" class="check box-check" value="${b.id}" data-status="${esc(String(b.status || "").toLowerCase())}" data-storage="${isStorage(b) ? 1 : 0}" />
       <span class="main"><span class="t">Box #${b.id}${b.velikost ? ` <span class="muted">- ${esc(b.velikost)}</span>` : ""}</span>
       <span class="s">${cleanLoc(b.lokacija) ? esc(b.lokacija) : "Lokacija ni določena"}${narocninaDo(b) ? ` · Naročnina do: ${fmtDate(narocninaDo(b))}` : ""}</span></span>
       <span class="end">${boxStatusBadge(b.status)}</span></label>`;
@@ -348,24 +348,44 @@
         <div class="kv"><span class="k">Poteče / obnova</span><span class="v">${fmtDate(narocninaDo())}</span></div>
       </div>
       ${boxiSection}
-      <div class="deliver-bar hidden" id="deliverBar"><div class="inner"><button class="btn primary" id="deliverBtn">Naroči dostavo izbranih</button></div></div>`;
+      <div class="deliver-bar hidden" id="deliverBar"><div class="inner"></div></div>`;
   }
   function wireNadzor() {
-    const bar = $("#deliverBar"), btn = $("#deliverBtn"), empty = $("#newOrderEmpty");
+    const bar = $("#deliverBar"), inner = bar ? $(".inner", bar) : null, empty = $("#newOrderEmpty");
     if (empty) empty.addEventListener("click", () => { window.location.href = "../narocilo/"; });
     $$(".nchoice[data-view]").forEach((c) => c.addEventListener("click", () => {
       const v = c.getAttribute("data-view");
       state.boxView = (state.boxView === v) ? null : v;
       renderTab();
     }));
+    // Gumbi se prilagodijo stanju in storitvi izbranih boxov:
+    //  Skladiščenje pri stranki -> prevoz v skladišče / vračilo
+    //  Skladiščenje v skladišču  -> dostava k sebi
+    //  Izposoja pri stranki      -> vračilo
     const update = () => {
       const sel = $$(".box-check:checked");
-      if (!btn) return;
-      if (sel.length) { if (bar) bar.classList.remove("hidden"); btn.disabled = false; btn.textContent = `Naroči dostavo izbranih (${sel.length})`; }
-      else { if (bar) bar.classList.add("hidden"); btn.textContent = "Naroči dostavo izbranih"; }
+      if (!bar || !inner) return;
+      if (!sel.length) { bar.classList.add("hidden"); inner.innerHTML = ""; return; }
+      bar.classList.remove("hidden");
+      const statuses = [...new Set(sel.map((c) => c.dataset.status))];
+      const storages = [...new Set(sel.map((c) => c.dataset.storage))];
+      const ids = sel.map((c) => Number(c.value));
+      const msg = (t) => `<div class="deliver-msg">${t}</div>`;
+      const abtn = (a, l, cls) => `<button class="btn ${cls || "primary"} act-btn" type="button" data-action="${a}">${l} (${ids.length})</button>`;
+      let html;
+      if (statuses.length > 1 || storages.length > 1) {
+        html = msg("Izberi bokse v istem stanju in isti storitvi.");
+      } else {
+        const st = statuses[0], isSkl = storages[0] === "1";
+        if (isSkl && st === "pri_stranki") html = `<div class="deliver-actions">${abtn("prevoz_skladisce", "Naroči prevoz v skladišče")}${abtn("vracilo", "Naroči vračilo boxov", "outline-2")}</div>`;
+        else if (isSkl && st === "v_skladiscu") html = abtn("dostava", "Naroči dostavo k sebi");
+        else if (!isSkl && st === "pri_stranki") html = abtn("vracilo", "Naroči vračilo");
+        else html = msg("Ti boxi trenutno niso na voljo za naročilo (na zalogi / v transportu).");
+      }
+      inner.innerHTML = html;
+      $$(".act-btn", inner).forEach((b) => b.addEventListener("click", () => newOrder(ids, b.dataset.action)));
     };
     $$(".box-check").forEach((c) => c.addEventListener("change", update));
-    if (btn) btn.addEventListener("click", () => newOrder($$(".box-check:checked").map((c) => Number(c.value))));
     const selAllSkl = $("#selAllSkl");
     if (selAllSkl) selAllSkl.addEventListener("click", () => {
       const checks = $$('[data-group="skl"] .box-check');
@@ -476,14 +496,23 @@
     sel.innerHTML = o;
     if (hint) hint.textContent = "Zasedeni termini so onemogočeni (dostava traja 1 uro).";
   }
-  async function newOrder() {
-    openSheet(`<h3>Vračilo</h3><form id="orderForm">
-      <div class="field"><label>Naslov vračila</label><input id="oAddr" placeholder="Ulica in hišna številka, kraj" value="${esc((state.kupec && state.kupec.naslov) || "")}" /></div>
+  const REQ_ACTIONS = {
+    prevoz_skladisce: { label: "Prevoz v skladišče", title: "Naroči prevoz v skladišče", submit: "Naroči prevoz", addr: "Naslov prevzema" },
+    dostava:          { label: "Dostava k stranki",  title: "Naroči dostavo k sebi",     submit: "Naroči dostavo", addr: "Naslov dostave" },
+    vracilo:          { label: "Vračilo",            title: "Naroči vračilo boxov",      submit: "Naroči vračilo", addr: "Naslov prevzema" },
+  };
+  async function newOrder(ids, action) {
+    ids = Array.isArray(ids) ? ids : [];
+    const a = REQ_ACTIONS[action] || REQ_ACTIONS.vracilo;
+    openSheet(`<h3>${esc(a.title)}</h3><form id="orderForm">
+      <div class="field"><label>${esc(a.addr)}</label><input id="oAddr" placeholder="Ulica in hišna številka, kraj" value="${esc((state.kupec && state.kupec.naslov) || "")}" /></div>
       <div class="field"><label>Datum</label><input type="date" id="oDate" min="${todayISO()}" /></div>
       <div class="field"><label>Ura</label><select id="oTime"><option value="">Najprej izberi datum</option></select><div class="hint" id="oTimeHint"></div></div>
-      <div class="field"><label>Opomba</label><textarea id="oNote" rows="3" placeholder="Posebnosti, št. boxov, ..."></textarea></div>
-      <button class="btn primary" type="submit" id="oSubmit">Naroči vračilo</button>
+      <div class="field"><label>Opomba</label><textarea id="oNote" rows="3" placeholder="Posebnosti, ..."></textarea></div>
+      ${ids.length ? `<div class="hint" style="margin:-6px 0 12px">Izbrani boxi: ${ids.map((i) => "#" + i).join(", ")}</div>` : ""}
+      <button class="btn primary" type="submit" id="oSubmit">${esc(a.submit)}</button>
       <button class="btn ghost mt" type="button" data-close>Prekliči</button></form>`);
+    const form = $("#orderForm"); form.dataset.action = action || "vracilo"; form.dataset.ids = JSON.stringify(ids);
     const de = $("#oDate");
     if (de) {
       if (window.flatpickr) {
@@ -501,16 +530,26 @@
   }
   async function submitOrder(e) {
     e.preventDefault();
+    const form = e.target;
+    const action = form.dataset.action || "vracilo";
+    const ids = (() => { try { return JSON.parse(form.dataset.ids || "[]"); } catch { return []; } })();
+    const a = REQ_ACTIONS[action] || REQ_ACTIONS.vracilo;
     const btn = $("#oSubmit");
     const addr = $("#oAddr").value.trim(), date = $("#oDate").value || null, time = $("#oTime").value, note = $("#oNote").value.trim();
-    if (!addr || !date || !time) { alert("Prosim vpiši naslov, datum in uro vračila."); return; }
+    if (!addr || !date || !time) { alert("Prosim vpiši naslov, datum in uro."); return; }
     btn.disabled = true; btn.textContent = "Pošiljam...";
-    const opomba = ["Vračilo", "Naslov: " + addr, "Ura: " + time, note].filter(Boolean).join(" | ");
+    // Vrsta zahteve je prvi del opombe (skladiščni sistem bere split_part(opomba,' - ',1)).
+    const opomba = a.label + " - " + ["Naslov: " + addr, "Ura: " + time, note].filter(Boolean).join(" | ");
     try {
-      const { error } = await state.sb.from("zahteve_dostave").insert({ kupec_id: state.kupec.id, status: "nova", brezplacna: false, datum_zahteve: new Date().toISOString(), datum_dostave: date, opomba });
+      const { data: zd, error } = await state.sb.from("zahteve_dostave").insert({ kupec_id: state.kupec.id, status: "nova", brezplacna: false, datum_zahteve: new Date().toISOString(), datum_dostave: date, opomba }).select("id").single();
       if (error) throw error;
-      closeSheet(); toast("Vračilo naročeno"); state.tab = "narocila"; renderTab();
-    } catch (err) { alert("Napaka: " + (err.message || err)); btn.disabled = false; btn.textContent = "Naroči vračilo"; }
+      if (zd && zd.id && ids.length) {
+        const rows = ids.map((bid) => ({ zahteva_id: zd.id, skatla_id: bid }));
+        const r2 = await state.sb.from("zahteve_dostave_skatle").insert(rows);
+        if (r2.error) console.warn("Povezava boxov:", r2.error.message);
+      }
+      closeSheet(); toast("Zahteva oddana"); state.tab = "narocila"; renderTab();
+    } catch (err) { alert("Napaka: " + (err.message || err)); btn.disabled = false; btn.textContent = a.submit; }
   }
 
   async function viewRacuni() {

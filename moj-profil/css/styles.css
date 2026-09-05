@@ -294,3 +294,7 @@ button, .btn, a.btn, .row.selectable, .nchoice, .tab { -webkit-tap-highlight-col
 /* Klikabilna vrstica naročila */
 .order-row { cursor: pointer; transition: background .12s; }
 .order-row:hover { background: var(--surface-2); }
+
+/* Dinamični gumbi za dostavo/vračilo glede na stanje boxov */
+.deliver-actions { display: flex; gap: 10px; }
+.deliver-msg { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; text-align: center; color: var(--muted); font-size: 13.5px; box-shadow: var(--shadow-l); }

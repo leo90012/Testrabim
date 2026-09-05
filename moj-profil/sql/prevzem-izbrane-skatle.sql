@@ -91,21 +91,22 @@ begin
 
   v_izbrane := coalesce(p_skatle, array[]::bigint[]);
 
-  -- vse škatle tega naročila
-  create temp table if not exists _skatle_narocila (id bigint) on commit drop;
-  delete from _skatle_narocila;
-  insert into _skatle_narocila (id)
-  select s.id from public.skatle s
+  -- vse škatle tega naročila (brez začasne tabele – Supabase blokira DELETE brez WHERE)
+  select count(*) into v_naroceno
+  from public.skatle s
   where s.narocnina_id in (select n.id from public.narocnine n where n.narocilo_id = p_narocilo_id);
 
-  select count(*) into v_naroceno from _skatle_narocila;
   if v_naroceno = 0 then
     raise exception 'Temu naročilu ni dodeljena nobena škatla, zato prevzema ni mogoče potrditi.';
   end if;
 
   -- izbrane morajo pripadati temu naročilu
-  if exists (select 1 from unnest(v_izbrane) x(id)
-             where x.id not in (select id from _skatle_narocila)) then
+  if exists (
+    select 1 from unnest(v_izbrane) x(id)
+    where x.id not in (
+      select s.id from public.skatle s
+      where s.narocnina_id in (select n.id from public.narocnine n where n.narocilo_id = p_narocilo_id))
+  ) then
     raise exception 'Med izbranimi je škatla, ki ne pripada temu naročilu.';
   end if;
 
@@ -120,7 +121,8 @@ begin
   select string_agg(coalesce(s.barkoda,'#'||s.id), ', ' order by s.barkoda)
     into v_vrnj_txt
   from public.skatle s
-  where s.id in (select id from _skatle_narocila) and not (s.id = any(v_izbrane));
+  where s.narocnina_id in (select n.id from public.narocnine n where n.narocilo_id = p_narocilo_id)
+    and not (s.id = any(v_izbrane));
 
   -- ------------------------------------------------------
   -- izbrane -> pri stranki
@@ -137,7 +139,7 @@ begin
       kupec_id     = null,
       narocnina_id = null,
       lokacija     = null
-  where id in (select id from _skatle_narocila)
+  where narocnina_id in (select n.id from public.narocnine n where n.narocilo_id = p_narocilo_id)
     and not (id = any(v_izbrane));
   get diagnostics v_sprosceno = row_count;
 
