@@ -1,9 +1,10 @@
 -- ============================================================
---  Rabimbox – Naročnina: začetek = dan dostave, obnova = mesec − 1 dan
+--  Rabimbox – Naročnina: začetek = TERMIN DOSTAVE, obnova = mesec − 1 dan
 --  Zaženi v Supabase SQL Editor (Dashboard -> SQL Editor -> Run).
 --  Ko admin v skladiščni aplikaciji označi škatlo kot "pri_stranki"
 --  (dostavljeno), se naročnini nastavi:
---    datum_od = današnji dan (če še ni),
+--    datum_od = termin dostave (iz zahteve za dostavo ali naročila),
+--               oz. ročno podan datum, sicer današnji dan,
 --    datum_do = datum_od + 1 mesec − 1 dan,
 --    status   = aktivna.
 -- ============================================================
@@ -12,7 +13,7 @@ create or replace function public.sklad_update_box(
   p_kupec_email text default null, p_lokacija_koda text default null, p_opomba text default null,
   p_datum_od date default null, p_datum_do date default null, p_nar_status text default null
 ) returns void language plpgsql security definer set search_path=public as $$
-declare v_lok bigint; v_kup bigint;
+declare v_lok bigint; v_kup bigint; v_termin date; v_od date;
 begin
   if not public.is_admin() then raise exception 'Samo administrator lahko ureja.'; end if;
 
@@ -33,10 +34,27 @@ begin
   where id = p_id;
 
   if lower(coalesce(p_status,'')) = 'pri_stranki' then
-    -- dostavljeno: zacetek = danes, obnova = mesec - 1 dan
+    -- dostavljeno: zacetek naročnine = TERMIN DOSTAVE
+    -- 1) termin iz zahteve za dostavo, ki vsebuje ta box (vrsta ni "Prevoz v skladišče")
+    select z.datum_dostave into v_termin
+    from public.zahteve_dostave z
+    join public.zahteve_dostave_skatle zs on zs.zahteva_id = z.id
+    where zs.skatla_id = p_id and z.datum_dostave is not null
+      and lower(split_part(coalesce(z.opomba,''),' - ',1)) not like 'prevoz%'
+    order by z.datum_dostave desc limit 1;
+    -- 2) sicer termin iz spletnega naročila stranke
+    if v_termin is null then
+      select n2.datum_dostave into v_termin
+      from public.narocila n2
+      join public.kupci k on lower(k.email) = lower(n2.email)
+      join public.skatle s2 on s2.id = p_id and s2.kupec_id = k.id
+      where n2.datum_dostave is not null
+      order by n2.datum_dostave desc limit 1;
+    end if;
+    -- prednost: obstoječi datum_od -> ročno podan -> termin dostave -> danes
     update public.narocnine n set
-      datum_od = coalesce(n.datum_od, current_date),
-      datum_do = (coalesce(n.datum_od, current_date) + interval '1 month' - interval '1 day')::date,
+      datum_od = coalesce(n.datum_od, p_datum_od, v_termin, current_date),
+      datum_do = (coalesce(n.datum_od, p_datum_od, v_termin, current_date) + interval '1 month' - interval '1 day')::date,
       status = 'aktivna', updated_at = now()
     from public.skatle s where s.id = p_id and n.id = s.narocnina_id;
   else
