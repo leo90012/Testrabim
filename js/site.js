@@ -6,8 +6,17 @@
 
   // Mobile menu
   var burger=document.getElementById('burger'), nav=document.getElementById('nav');
-  burger.addEventListener('click',function(){ nav.classList.toggle('open'); });
-  nav.querySelectorAll('a').forEach(function(a){ a.addEventListener('click',function(){ nav.classList.remove('open'); }); });
+  var burgerPath=burger.querySelector('path'), IKONA_MENI='M4 7h16M4 12h16M4 17h16', IKONA_ZAPRI='M6 6l12 12M18 6L6 18';
+  function setMenu(odprt){
+    nav.classList.toggle('open',odprt);
+    burger.setAttribute('aria-expanded',odprt?'true':'false');
+    burger.setAttribute('aria-label',odprt?'Zapri meni':'Odpri meni');
+    if(burgerPath) burgerPath.setAttribute('d',odprt?IKONA_ZAPRI:IKONA_MENI);
+  }
+  burger.addEventListener('click',function(e){ e.stopPropagation(); setMenu(!nav.classList.contains('open')); });
+  nav.querySelectorAll('a').forEach(function(a){ a.addEventListener('click',function(){ setMenu(false); }); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&nav.classList.contains('open')){ setMenu(false); burger.focus(); } });
+  document.addEventListener('click',function(e){ if(nav.classList.contains('open')&&!nav.contains(e.target)&&!burger.contains(e.target)) setMenu(false); });
 
   var reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 

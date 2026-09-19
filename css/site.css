@@ -41,8 +41,8 @@ svg[stroke-width]{stroke:currentColor}
 /* Header */
 .hdr{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid transparent;transition:box-shadow .2s,border-color .2s,padding .2s}
 .hdr.scrolled{box-shadow:0 6px 20px rgba(16,24,40,.06);border-color:var(--line)}
-.hdr-in{display:flex;align-items:center;justify-content:space-between;padding:16px 0;transition:padding .2s}
-.hdr.scrolled .hdr-in{padding:10px 0}
+.hdr-in{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:16px;transition:padding .2s}
+.hdr.scrolled .hdr-in{padding-block:10px}
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--f-head);font-weight:700;font-size:20px;color:var(--ink)}
 .brand img{height:34px;width:auto}
 .nav{display:flex;align-items:center;gap:28px}
@@ -52,7 +52,7 @@ svg[stroke-width]{stroke:currentColor}
 .burger{display:none;background:none;border:0;padding:8px;cursor:pointer}
 .burger svg{width:26px;height:26px;stroke:var(--ink)}
 @media(max-width:880px){
-  .nav{position:fixed;inset:64px 0 auto 0;flex-direction:column;align-items:stretch;gap:0;background:#fff;border-bottom:1px solid var(--line);padding:8px 22px 18px;box-shadow:var(--shadow);transform:translateY(-140%);transition:transform .25s ease;visibility:hidden}
+  .nav{position:absolute;top:100%;left:0;right:0;max-height:calc(100vh - 70px);overflow-y:auto;flex-direction:column;align-items:stretch;gap:0;background:#fff;border-bottom:1px solid var(--line);padding:8px 22px 18px;box-shadow:var(--shadow);transform:translateY(-140%);transition:transform .25s ease;visibility:hidden}
   .nav.open{transform:translateY(0);visibility:visible}
   .nav a.lnk{padding:13px 4px;border-bottom:1px solid var(--line);opacity:1}
   .nav .btn{margin-top:12px;justify-content:center}
@@ -62,7 +62,7 @@ svg[stroke-width]{stroke:currentColor}
 /* Hero */
 .hero{position:relative;color:#fff;background:linear-gradient(135deg,#0052cc 0%,#0067ff 55%,#3b86ff 100%);overflow:hidden}
 .hero::after{content:"";position:absolute;inset:0;background:radial-gradient(1200px 500px at 80% -10%,rgba(110,193,228,.28),transparent 60%);pointer-events:none}
-.hero-in{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;padding:clamp(56px,8vw,96px) 0}
+.hero-in{position:relative;z-index:1;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;padding-block:clamp(56px,8vw,96px)}
 .hero h1{font-size:clamp(30px,5vw,52px);letter-spacing:-.02em}
 .hero h1 .hl{color:var(--accent)}
 .hero p{color:rgba(255,255,255,.86);font-size:clamp(15.5px,2vw,19px);max-width:56ch;margin:18px 0 28px}
@@ -110,7 +110,7 @@ svg[stroke-width]{stroke:currentColor}
 .pc{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:30px 26px;text-align:center;position:relative;transition:transform .2s,box-shadow .2s}
 .pc:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
 .pc.feat{border-color:var(--navy);box-shadow:0 0 0 3px rgba(0,103,255,.1),var(--shadow)}
-.pc .tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;font-size:11px;font-weight:600;letter-spacing:.02em;line-height:1;white-space:nowrap;padding:5px 12px;border-radius:20px;box-shadow:0 4px 10px rgba(0,103,255,.28)}
+.pc .tag{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;font-size:12px;font-weight:600;letter-spacing:.02em;line-height:1;white-space:nowrap;padding:5px 12px;border-radius:20px;box-shadow:0 4px 10px rgba(0,103,255,.28)}
 .pc.feat{padding-top:34px;text-align:center}
 .pc h3{font-size:17px;color:var(--muted);font-weight:600;font-family:var(--f-body)}
 .pc .amt{font-family:var(--f-head);font-weight:700;font-size:38px;color:var(--ink);margin:6px 0 2px}
@@ -260,3 +260,101 @@ svg[stroke-width]{stroke:currentColor}
 .pc{display:flex;flex-direction:column;align-items:center}
 .pc h3,.pc .amt,.pc .desc{width:100%}
 .pc .btn{margin-top:auto;align-self:center}
+
+/* Mreze, ki so imele stolpce v inline slogu (inline slog preglasi media query) */
+.price-grid.pg-4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));max-width:980px}
+.price-grid.pg-5{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));max-width:1120px}
+.pc .amt.amt-sm{font-size:28px}
+.feats.feats-3{grid-template-columns:repeat(3,1fr);max-width:900px;margin:0 auto}
+@media(max-width:820px){.feats.feats-3{grid-template-columns:1fr}}
+
+/* Gumb "Naroci" v glavi – viden samo na telefonu/tablici, ko je meni skrit */
+.hdr-cta{display:none}
+
+/* ===== Telefon in tablica (v20260917) ===== */
+@media(max-width:880px){
+  .hdr-cta{display:inline-flex;margin-left:auto;padding:9px 16px;font-size:14px;box-shadow:0 6px 16px rgba(0,103,255,.25)}
+  .burger{margin-right:-8px}
+  /* Hero: najprej sporocilo in gumb, slika pod njim in manjsa.
+     minmax(0,1fr): lezeca slika z omejeno visino sicer razsiri stolpec cez zaslon */
+  .hero-in{padding-block:36px 44px;gap:28px;grid-template-columns:minmax(0,1fr)!important}
+  .hero-visual,.hero-card{min-width:0;max-width:100%}
+  .hero-visual{order:0}
+  .hero-card{padding:16px;border-radius:20px}
+  .hero-card img{max-height:240px}
+  .hero p{margin:14px auto 22px}
+  .hero-stats{margin-top:26px;padding-top:20px}
+}
+@media(max-width:560px){
+  :root{--sp:48px}
+  .container{padding-inline:18px}
+  .sec-head{margin-bottom:28px}
+  .lead{font-size:15.5px}
+  .brand-logo{height:32px}
+
+  /* Hero */
+  .hero-cta{gap:10px;flex-wrap:nowrap}
+  .hero-cta .btn{flex:1 1 0;justify-content:center;padding:13px 12px;font-size:15px}
+  .hero-stats{gap:10px;flex-wrap:nowrap;justify-content:space-between}
+  .hero-stats>div{flex:1 1 0;min-width:0}
+  .hero-stats .num{font-size:22px}
+  .hero-stats .lab{font-size:12px;line-height:1.35}
+
+  /* Nizja glava */
+  .hdr-in,.hdr.scrolled .hdr-in{padding-block:10px}
+  .brand img{height:32px}
+
+  /* Koraki "Kako deluje": ikona levo, besedilo desno */
+  .steps{gap:12px}
+  .step{display:grid;grid-template-columns:46px 1fr;column-gap:14px;align-items:start;padding:18px 44px 18px 16px}
+  .step .ic{width:46px;height:46px;margin:0;grid-row:1 / span 2}
+  .step h3{font-size:16.5px;margin:2px 0 4px;grid-column:2}
+  .step p{grid-column:2;font-size:14px}
+  .step .no{font-size:22px;top:14px;right:14px}
+  .svc{gap:14px}
+  .svc-card{padding:24px 20px;gap:10px}
+  .svc-card h3{font-size:20px}
+  .svc-card a.more{min-height:44px}
+  .feats{gap:14px}
+  .cta-band{border-radius:18px;padding:32px 20px}
+
+  /* Paketi: dva stolpca namesto dolgega stolpca kartic */
+  .price-grid,.price-grid.pg-4,.price-grid.pg-5{grid-template-columns:1fr 1fr;gap:12px;max-width:none}
+  .price-grid>.pc:last-child:nth-child(odd){grid-column:1/-1}
+  .pc{padding:20px 10px 14px}
+  .pc.feat{padding-top:20px}
+  .pc h3{font-size:14.5px}
+  .pc .amt{font-size:26px;margin:4px 0 0}
+  .pc .amt span{font-size:12.5px}
+  .pc .amt.amt-sm{font-size:21px}
+  .pc .desc{font-size:12.5px;margin-bottom:12px}
+  .pc .btn{align-self:stretch;justify-content:center;padding:11px 8px;font-size:14px}
+  .pc .tag{font-size:11.5px;padding:5px 10px}
+  .pc:hover,.step:hover,.svc-card:hover{transform:none}
+
+  /* Cenik: vrstice cen */
+  .incl-card{padding:20px 18px 8px}
+  .prow{font-size:14.5px}
+
+  /* Ocene */
+  .rv-card{flex-basis:88%;max-width:88%}
+  .rv-more{padding:10px 0;min-height:40px}
+
+  /* Clanki */
+  .article p{font-size:16px;line-height:1.75}
+  .article h2{font-size:21px;margin-top:28px}
+  .article-back{min-height:44px}
+
+  /* Noga: povezave v dveh stolpcih, vecje tarce za dotik */
+  .ft{padding:44px 0 26px}
+  .ft-top{grid-template-columns:1fr 1fr;gap:26px 18px}
+  .ft-top>div:first-child,.ft-top>div:last-child{grid-column:1/-1}
+  .ft a.f{line-height:1.35;padding:11px 0}
+  .ft-bot{flex-direction:column;align-items:flex-start;gap:12px;margin-top:26px}
+  .pay{flex-wrap:wrap}
+}
+@media(max-width:360px){
+  .hdr-cta{padding:8px 12px}
+  .hero-cta{flex-wrap:wrap}
+  .hero-cta .btn{flex:1 1 100%}
+}

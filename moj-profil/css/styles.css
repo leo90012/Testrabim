@@ -204,7 +204,7 @@ svg { display: block; }
 .auth-logo p { margin: 0; color: var(--muted); font-size: 13.5px; }
 .auth-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: var(--shadow); }
 .seg { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 4px; margin-bottom: 18px; }
-.seg button { flex: 1; border: 0; background: none; color: var(--muted); padding: 9px; border-radius: 7px; font-weight: 600; font-size: 13.5px; }
+.seg button { flex: 1; border: 0; background: none; color: var(--muted); padding: 9px; min-height: 42px; border-radius: 7px; font-weight: 600; font-size: 14px; }
 .seg button.active { background: var(--surface); color: var(--brand); box-shadow: var(--shadow); }
 
 /* Opozorila */

@@ -150,10 +150,19 @@ begin
   v_cena_potem := public.rb_cena(v_nar.tip, v_vzeto);
   v_vracilo    := greatest(v_cena_prej - v_cena_potem, 0);
 
+  -- Naročnina: količina, cena in – ker je to dejanska dostava – tudi
+  -- začetek obdobja. Isto pravilo kot v dostava-narocnina.sql:
+  --   datum_od = dan dostave (če še ni nastavljen)
+  --   datum_do = datum_od + 1 mesec − 1 dan
   update public.narocnine
   set st_boxov     = v_vzeto,
       cena_mesecna = v_cena_potem,
-      status       = case when v_vzeto = 0 then 'preklicana' else status end
+      datum_od     = case when v_vzeto > 0 then coalesce(datum_od, current_date) else datum_od end,
+      datum_do     = case when v_vzeto > 0
+                          then (coalesce(datum_od, current_date) + interval '1 month' - interval '1 day')::date
+                          else datum_do end,
+      status       = case when v_vzeto = 0 then 'preklicana' else 'aktivna' end,
+      updated_at   = now()
   where narocilo_id = p_narocilo_id;
 
   update public.narocila
