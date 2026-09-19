@@ -33,7 +33,7 @@ function znesekZa(o: any): number {
     const m: Record<number, number> = { 20: 49, 40: 89, 60: 119, 80: 149 };
     return m[n] ?? 0;
   }
-  const per = n <= 10 ? 3.90 : n <= 25 ? 3.60 : 3.30;
+  const per = n <= 10 ? 4.90 : n <= 25 ? 4.20 : 3.80;
   return Math.round(n * per * 100) / 100;
 }
 function d(dt: Date) { return dt.toISOString().slice(0, 10); }

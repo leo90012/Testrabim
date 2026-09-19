@@ -28,7 +28,7 @@ function znesekZa(o: any): number {
     return m[n] ?? 0;
   }
   // skladiščenje: cena/box glede na količino
-  const per = n <= 10 ? 3.90 : n <= 25 ? 3.60 : 3.30;
+  const per = n <= 10 ? 4.90 : n <= 25 ? 4.20 : 3.80;
   return Math.round(n * per * 100) / 100;
 }
 

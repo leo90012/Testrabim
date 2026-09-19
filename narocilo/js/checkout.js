@@ -13,9 +13,9 @@
     {id:"izpkontakt",naziv:"Nad 80 boxov",contact:true}
   ];
   var SKL=[
-    {id:"skl10",naziv:"Do 10 boxov",min:1,max:10,perBox:3.90},
-    {id:"skl25",naziv:"Do 25 boxov",min:11,max:25,perBox:3.60},
-    {id:"skl50",naziv:"Do 50 boxov",min:26,max:50,perBox:3.30},
+    {id:"skl10",naziv:"Do 10 boxov",min:1,max:10,perBox:4.90},
+    {id:"skl25",naziv:"Do 25 boxov",min:11,max:25,perBox:4.20},
+    {id:"skl50",naziv:"Do 50 boxov",min:26,max:50,perBox:3.80},
     {id:"sklkontakt",naziv:"Nad 50 boxov",contact:true}
   ];
   var STEPS=[["paketi","Paketi"],["termin","Termin"],["povzetek","Povzetek"]];
@@ -58,7 +58,7 @@
     render('<h1 class="co-title">Naroči zdaj</h1><p class="co-sub">Izberi storitev, ki jo potrebuješ</p>'+
       '<div class="choice-grid">'+
       '<div class="choice" data-tip="izposoja"><div class="ic">'+ICON.truck+'</div><div class="t">Izposoja</div><div class="d">Najem trpežnih boxov za selitev</div><div class="cp">od 49 € / selitev</div></div>'+
-      '<div class="choice" data-tip="skladiscenje"><div class="ic">'+ICON.box+'</div><div class="t">Skladiščenje</div><div class="d">Shranjevanje na zahtevo, dostava na dom</div><div class="cp">od 3,30 € / box na mesec</div></div>'+
+      '<div class="choice" data-tip="skladiscenje"><div class="ic">'+ICON.box+'</div><div class="t">Skladiščenje</div><div class="d">Shranjevanje na zahtevo, dostava na dom</div><div class="cp">od 3,80 € / box na mesec</div></div>'+
       '</div>');
     q$all(".choice").forEach(function(c){c.onclick=function(){s.tip=c.getAttribute("data-tip");s.plan=null;s.stBoxov=null;s.step="paketi";route();};});
   }
@@ -471,7 +471,7 @@
   function znesekZaNarocilo(o){
     var tip=String(o.tip||"").toLowerCase();var n=Number(o.st_boxov)||0;
     if(tip.indexOf("izpos")>-1){var m={20:49,40:89,60:119,80:149};return m[n]||0;}
-    var per=n<=10?3.90:n<=25?3.60:3.30;return Math.round(n*per*100)/100;
+    var per=n<=10?4.90:n<=25?4.20:3.80;return Math.round(n*per*100)/100;
   }
   async function potrdiPlacilo(ref){
     // Ob vrnitvi s Stripe označi naročilo kot plačano in izda račun.
