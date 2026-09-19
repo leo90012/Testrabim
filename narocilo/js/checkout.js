@@ -6,10 +6,10 @@
   var sb=(window.supabase&&window.supabase.createClient)?window.supabase.createClient(CFG.SUPABASE_URL,CFG.SUPABASE_ANON_KEY):null;
 
   var IZP=[
-    {id:"izp20",naziv:"20 boxov",boxes:20,cena:49},
-    {id:"izp40",naziv:"40 boxov",boxes:40,cena:89},
-    {id:"izp60",naziv:"60 boxov",boxes:60,cena:119},
-    {id:"izp80",naziv:"80 boxov",boxes:80,cena:149},
+    {id:"izp20",naziv:"20 boxov",boxes:20,cena:69},
+    {id:"izp40",naziv:"40 boxov",boxes:40,cena:109},
+    {id:"izp60",naziv:"60 boxov",boxes:60,cena:149},
+    {id:"izp80",naziv:"80 boxov",boxes:80,cena:189},
     {id:"izpkontakt",naziv:"Nad 80 boxov",contact:true}
   ];
   var SKL=[
@@ -57,7 +57,7 @@
   function viewChoice(){
     render('<h1 class="co-title">Naroči zdaj</h1><p class="co-sub">Izberi storitev, ki jo potrebuješ</p>'+
       '<div class="choice-grid">'+
-      '<div class="choice" data-tip="izposoja"><div class="ic">'+ICON.truck+'</div><div class="t">Izposoja</div><div class="d">Najem trpežnih boxov za selitev</div><div class="cp">od 49 € / selitev</div></div>'+
+      '<div class="choice" data-tip="izposoja"><div class="ic">'+ICON.truck+'</div><div class="t">Izposoja</div><div class="d">Najem trpežnih boxov za selitev</div><div class="cp">od 69 € / selitev</div></div>'+
       '<div class="choice" data-tip="skladiscenje"><div class="ic">'+ICON.box+'</div><div class="t">Skladiščenje</div><div class="d">Shranjevanje na zahtevo, dostava na dom</div><div class="cp">od 3,80 € / box na mesec</div></div>'+
       '</div>');
     q$all(".choice").forEach(function(c){c.onclick=function(){s.tip=c.getAttribute("data-tip");s.plan=null;s.stBoxov=null;s.step="paketi";route();};});
@@ -470,7 +470,7 @@
 
   function znesekZaNarocilo(o){
     var tip=String(o.tip||"").toLowerCase();var n=Number(o.st_boxov)||0;
-    if(tip.indexOf("izpos")>-1){var m={20:49,40:89,60:119,80:149};return m[n]||0;}
+    if(tip.indexOf("izpos")>-1){var m={20:69,40:109,60:149,80:189};return m[n]||0;}
     var per=n<=10?4.90:n<=25?4.20:3.80;return Math.round(n*per*100)/100;
   }
   async function potrdiPlacilo(ref){

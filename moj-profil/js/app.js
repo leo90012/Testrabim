@@ -663,7 +663,7 @@
   }
   function orderAmount(o) {
     const tip = String(o.tip || "").toLowerCase(); const n = Number(o.st_boxov) || 0;
-    if (tip.includes("izpos")) { const m = { 20: 49, 40: 89, 60: 119, 80: 149 }; return m[n] || 0; }
+    if (tip.includes("izpos")) { const m = { 20: 69, 40: 109, 60: 149, 80: 189 }; return m[n] || 0; }
     const per = n <= 10 ? 4.90 : n <= 25 ? 4.20 : 3.80; return Math.round(n * per * 100) / 100;
   }
   async function handlePlacilo() {

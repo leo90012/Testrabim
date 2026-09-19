@@ -24,7 +24,7 @@ function znesekZa(o: any): number {
   const tip = String(o.tip || "").toLowerCase();
   const n = Number(o.st_boxov) || 0;
   if (tip.includes("izpos")) {
-    const m: Record<number, number> = { 20: 49, 40: 89, 60: 119, 80: 149 };
+    const m: Record<number, number> = { 20: 69, 40: 109, 60: 149, 80: 189 };
     return m[n] ?? 0;
   }
   // skladiščenje: cena/box glede na količino
