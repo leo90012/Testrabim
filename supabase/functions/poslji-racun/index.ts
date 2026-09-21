@@ -144,11 +144,12 @@ async function makePdf(r: any, kupecNaslov: string, predracun: boolean) {
   T("Za", colR, cy, bold, 9, gray);
   cy += 15;
   const kupecIme = [r.ime, r.priimek].filter(Boolean).join(" ") || "Stranka";
+  const headName = r.podjetje ? String(r.podjetje) : kupecIme;
   T(FIRMA.naziv, M, cy, bold, 10.5, dark);
-  T(kupecIme, colR, cy, bold, 10.5, dark);
+  T(headName, colR, cy, bold, 10.5, dark);
   cy += 14;
   const compLines = [FIRMA.naslov, "TRR: " + FIRMA.iban, FIRMA.banka + " · SWIFT: " + FIRMA.swift, FIRMA.email];
-  const custLines = [kupecNaslov, r.email].filter(Boolean) as string[];
+  const custLines = [r.podjetje ? kupecIme : "", kupecNaslov, r.email, r.davcna ? ("ID za DDV: " + String(r.davcna)) : ""].filter(Boolean) as string[];
   const nrows = Math.max(compLines.length, custLines.length);
   for (let i = 0; i < nrows; i++) {
     if (compLines[i]) T(compLines[i], M, cy, font, 9, gray);
@@ -216,6 +217,7 @@ Deno.serve(async (req) => {
       const zap = new Date(); zap.setDate(zap.getDate() + 8);
       r = {
         stevilka: o.stevilka, ime: o.ime, priimek: o.priimek, email: o.email,
+        podjetje: o.podjetje, davcna: o.davcna,
         opis: (o.paket || "Rabimbox") + " - prvi mesec", osnova, ddv, znesek: total, valuta: "EUR",
         datum_izdaje: d(new Date()), datum_zapadlosti: d(zap),
       };

@@ -21,7 +21,7 @@
   var STEPS=[["paketi","Paketi"],["termin","Termin"],["povzetek","Povzetek"]];
 
   var s={step:"choice",tip:null,plan:null,stBoxov:null,extras:{stopnice:false,krhko:false,pomoc:false,dvigalo:false},
-    opis:"",nadstropje:"",naslov:"",enota:"",postna:"",mesto:"",telefon:"",datum:"",cas:"",ime:"",priimek:"",email:"",geslo:"",racunMode:"novo",soglasje:false,loggedIn:false,loginHint:false,kontaktBack:null,kontaktZadeva:""};
+    opis:"",nadstropje:"",naslov:"",enota:"",postna:"",mesto:"",telefon:"",datum:"",cas:"",ime:"",priimek:"",email:"",geslo:"",racunMode:"novo",soglasje:false,loggedIn:false,loginHint:false,kontaktBack:null,kontaktZadeva:"",podjetje:"",davcna:""};
 
   var LJ_POSTE=["1000","1210","1211","1215","1231","1235","1236","1260","1261","1262","1290","1291","1292","1293","1294","1295","1296","1351","1354","1355","1356","1357","1358","1360","1370"];
 
@@ -155,6 +155,8 @@
       '<div class="card"><h3>Kontaktni podatki</h3>'+
       '<div class="rowflex"><div class="field"><label>Ime</label><input id="ime" value="'+esc(s.ime)+'" /></div>'+
       '<div class="field"><label>Priimek</label><input id="priimek" value="'+esc(s.priimek)+'" /></div></div>'+
+      '<div class="rowflex"><div class="field"><label>Naziv podjetja <span style="font-weight:400;color:var(--muted);font-size:12px">(neobvezno)</span></label><input id="podjetje" value="'+esc(s.podjetje)+'" placeholder="Za račun na podjetje" /></div>'+
+      '<div class="field"><label>Davčna številka <span style="font-weight:400;color:var(--muted);font-size:12px">(neobvezno)</span></label><input id="davcna" value="'+esc(s.davcna)+'" placeholder="SI12345678" /></div></div>'+
       '<div class="rowflex"><div class="field"><label>Telefon</label><input id="telefon" value="'+esc(s.telefon)+'" placeholder="+386..." /></div>'+
       '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.email)+'" placeholder="ime@primer.si" /></div></div>'+
       '</div>'+
@@ -170,7 +172,7 @@
       '</div>'+
       '</div>'+summaryCard()+'</div>'+
       '<div id="terminNav">'+terminNavHtml()+'</div>');
-    ["ime","priimek","naslov","postna","mesto","telefon","email"].forEach(function(id){var e=q$("#"+id);if(e)e.oninput=function(ev){s[id]=ev.target.value;if(id==="postna"||id==="mesto")refreshTerminNav();};});
+    ["ime","priimek","podjetje","davcna","naslov","postna","mesto","telefon","email"].forEach(function(id){var e=q$("#"+id);if(e)e.oninput=function(ev){s[id]=ev.target.value;if(id==="postna"||id==="mesto")refreshTerminNav();};});
     q$all(".sw").forEach(function(sw){sw.onclick=function(){var k=sw.getAttribute("data-k");s.extras[k]=!s.extras[k];sw.classList.toggle("on",s.extras[k]);};});
     var op=q$("#opis");if(op)op.onchange=function(e){s.opis=e.target.value;};
     var nd=q$("#nadstropje");if(nd)nd.oninput=function(e){s.nadstropje=e.target.value;};
@@ -419,7 +421,7 @@
       cena_opis:cenaOpis(),stopnice:false,krhko:false,pomoc_polnjenje:s.extras.pomoc,
       opis_lokacije:("Vrsta objekta: "+(s.opis||"-")+" | Nadstropje: "+(s.nadstropje||"-")+" | Dvigalo: "+(s.extras.dvigalo?"Da":"Ne")),naslov:s.naslov||null,enota:null,postna_stevilka:s.postna||null,mesto:s.mesto||null,telefon:s.telefon||null,
       datum_dostave:s.datum||null,cas_dostave:s.cas||null,ime:s.ime||null,priimek:s.priimek||null,
-      email:s.email,stevilka:ref,placano:false,status:"nova"};
+      podjetje:s.podjetje||null,davcna:s.davcna||null,email:s.email,stevilka:ref,placano:false,status:"nova"};
     try{
       if(!sb)throw new Error("Supabase ni na voljo.");
       var r=await sb.from("narocila").insert(rec);
@@ -447,7 +449,7 @@
         var ddv=Math.round((total-osnova)*100)/100;
         var zap=new Date();zap.setDate(zap.getDate()+8);
         var zapStr=zap.getFullYear()+"-"+String(zap.getMonth()+1).padStart(2,"0")+"-"+String(zap.getDate()).padStart(2,"0");
-        var racun={stevilka:ref,osnova:osnova,ddv:ddv,znesek:total,valuta:"EUR",opis:planLabel()+" - prvi mesec",status:"izdan",email:s.email,ime:s.ime||null,priimek:s.priimek||null,datum_izdaje:todayStr(),datum_zapadlosti:zapStr};
+        var racun={stevilka:ref,osnova:osnova,ddv:ddv,znesek:total,valuta:"EUR",opis:planLabel()+" - prvi mesec",status:"izdan",email:s.email,ime:s.ime||null,priimek:s.priimek||null,podjetje:s.podjetje||null,davcna:s.davcna||null,datum_izdaje:todayStr(),datum_zapadlosti:zapStr};
         s.emailSent=false;
         var ri=await sb.from("racuni").insert(racun);
         if(!ri.error){s.racun={stevilka:ref,osnova:osnova,ddv:ddv,znesek:total,zapStr:zapStr};try{var fr=await sb.functions.invoke("poslji-racun",{body:{stevilka:ref}});if(fr&&!fr.error)s.emailSent=true;}catch(e){}}else{console.warn(ri.error);}

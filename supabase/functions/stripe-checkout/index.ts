@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
             const zap = new Date(); zap.setDate(zap.getDate() + 8);
             let kupec_id: number | null = null;
             try { const { data: k } = await sb.from("kupci").select("id").eq("email", o0.email).limit(1).maybeSingle(); if (k) kupec_id = k.id; } catch (_) { /* ignore */ }
-            await sb.from("racuni").insert({ stevilka: ref0, kupec_id, osnova, ddv, znesek: total, valuta: "EUR", opis: (o0.paket || "Rabimbox") + " - prvi mesec", status: "placan", email: o0.email, ime: o0.ime, priimek: o0.priimek, datum_izdaje: d(new Date()), datum_zapadlosti: d(zap) });
+            await sb.from("racuni").insert({ stevilka: ref0, kupec_id, osnova, ddv, znesek: total, valuta: "EUR", opis: (o0.paket || "Rabimbox") + " - prvi mesec", status: "placan", email: o0.email, ime: o0.ime, priimek: o0.priimek, podjetje: o0.podjetje, davcna: o0.davcna, datum_izdaje: d(new Date()), datum_zapadlosti: d(zap) });
             try { await fetch(SUPABASE_URL + "/functions/v1/poslji-racun", { method: "POST", headers: { "Authorization": "Bearer " + SERVICE_ROLE, "apikey": SERVICE_ROLE, "Content-Type": "application/json" }, body: JSON.stringify({ stevilka: ref0 }) }); } catch (_) { /* ignore */ }
           }
         }

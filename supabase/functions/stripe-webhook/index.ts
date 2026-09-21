@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
             await sb.from("racuni").insert({
               stevilka: ref, kupec_id, osnova, ddv, znesek: total, valuta: "EUR",
               opis: (o.paket || "Rabimbox") + " - prvi mesec", status: "placan",
-              email: o.email, ime: o.ime, priimek: o.priimek,
+              email: o.email, ime: o.ime, priimek: o.priimek, podjetje: o.podjetje, davcna: o.davcna,
               datum_izdaje: d(new Date()), datum_zapadlosti: d(zap),
             });
             // 3) pošlji račun po e-pošti (funkcija poslji-racun)
