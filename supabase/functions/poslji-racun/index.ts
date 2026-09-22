@@ -277,6 +277,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, pdf: pdfB64, filename: fname }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
+    // ------------------------------------------------------------
+    // VAROVALO PROTI PODVAJANJU
+    // Stripe webhook ob napaki ponovi klic (tudi večkrat), zato bi
+    // stranka prejela isti račun po nekajkrat. Če je račun že poslan,
+    // ga ne pošljemo znova – razen če klicatelj izrecno zahteva
+    // ponovno pošiljanje z { ponovno: true }.
+    // ------------------------------------------------------------
+    if (!predracun && !inp.ponovno && String(r.status || "").toLowerCase() === "poslan") {
+      return new Response(
+        JSON.stringify({ ok: true, tip, preskoceno: "racun je bil ze poslan" }),
+        { headers: { ...cors, "Content-Type": "application/json" } },
+      );
+    }
+
     const fname = (predracun ? "Predracun-" : "Racun-") + r.stevilka + ".pdf";
     const body: Record<string, unknown> = {
       from: FROM, to: [r.email], subject: `${labelSlo} ${r.stevilka} – Rabimbox`, html,
