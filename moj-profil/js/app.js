@@ -50,7 +50,7 @@
   // Interni statusi skladišča -> kaj vidi stranka (glej sql/integracija.sql)
   const BOX_STATUS = {
     na_zalogi:    { label: "Pripravljeno za dostavo", color: "blue" },
-    rezervirana:  { label: "Pripravljeno za dostavo", color: "blue" },
+    rezervirana:  { label: "V skladišču",           color: "blue" },
     v_transportu: { label: "Na poti",                 color: "amber" },
     pri_stranki:  { label: "Pri vas",                 color: "green" },
     v_skladiscu:  { label: "V skladišču",             color: "blue" },
@@ -310,14 +310,22 @@
     const k = state.kupec;
     const [{ data: boxiAll = [] }, { data: narocila = [] }, narRes] = await Promise.all([q.boxi(), q.narocila(), Promise.resolve(q.narocnine()).catch(() => ({ data: [] }))]);
     state.narocnine = (narRes && narRes.data) || [];
-    const boxi = (boxiAll || []).filter((b) => ["pri_stranki", "v_skladiscu"].includes(String(b.status || "").toLowerCase()));
-    state._boxes = boxi;
     const email = (state.session && state.session.user && state.session.user.email) || k.email || "";
     let ordersAll = [];
     try {
       const { data: ordersK } = await state.sb.from("narocila").select("*").eq("email", email).order("id", { ascending: false });
       ordersAll = (ordersK || []).filter((o) => o.placano === true || o.vir === "rocno");
     } catch (e) {}
+    const validOrders = new Set(ordersAll.map((o) => Number(o.id)));
+    const reservedSubs = new Set((state.narocnine || [])
+      .filter((n) => validOrders.has(Number(n.narocilo_id)))
+      .map((n) => Number(n.id)));
+    const boxi = (boxiAll || []).filter((b) => {
+      const status = String(b.status || "").toLowerCase();
+      return ["pri_stranki", "v_skladiscu"].includes(status) ||
+        (status === "rezervirana" && reservedSubs.has(Number(b.narocnina_id)));
+    });
+    state._boxes = boxi;
     const subStarted = (state.narocnine || []).some((x) => x.datum_od && String(x.status || "").toLowerCase() === "aktivna");
     const subBadge = subStarted ? subStatusBadge("aktivna") : (ordersAll.length ? subStatusBadge("v dostavi") : subStatusBadge(k.status_narocnine));
     const activeSubs = (state.narocnine || []).filter((x) => x.status === "aktivna");
@@ -328,10 +336,13 @@
       state.boxView = naj.length ? "naj" : skl.length ? "skl" : null;
     }
     const aktivna = narocila.filter((z) => { const s = (z.status || "").toLowerCase(); return !s.includes("zakljuc") && !s.includes("zaključ") && !s.includes("preklic") && !s.includes("dostavlj"); }).length;
-    const rowH = (b) => `<label class="row selectable"><input type="checkbox" class="check box-check" value="${b.id}" data-status="${esc(String(b.status || "").toLowerCase())}" data-storage="${isStorage(b) ? 1 : 0}" />
+    const rowH = (b) => {
+      const reserved = String(b.status || "").toLowerCase() === "rezervirana";
+      return `<${reserved ? "div" : "label"} class="row${reserved ? "" : " selectable"}">${reserved ? "" : `<input type="checkbox" class="check box-check" value="${b.id}" data-status="${esc(String(b.status || "").toLowerCase())}" data-storage="${isStorage(b) ? 1 : 0}" />`}
       <span class="main"><span class="t">Box ${esc(b.barkoda || ("#" + b.id))}</span></span>
-      <span class="end">${boxStatusBadge(b.status)}</span></label>`;
-    const group = (title, arr, gkey) => arr.length ? `<div class="section-title">${title} (${arr.length}) <button class="btn outline small" id="selAllBoxes" type="button" style="margin-left:8px">Izberi vse</button></div><div class="card" data-group="${gkey}">${arr.map(rowH).join("")}</div>` : "";
+      <span class="end">${boxStatusBadge(b.status)}</span></${reserved ? "div" : "label"}>`;
+    };
+    const group = (title, arr, gkey) => arr.length ? `<div class="section-title">${title} (${arr.length}) ${arr.some((b) => String(b.status || "").toLowerCase() !== "rezervirana") ? '<button class="btn outline small" id="selAllBoxes" type="button" style="margin-left:8px">Izberi vse</button>' : ""}</div><div class="card" data-group="${gkey}">${arr.map(rowH).join("")}</div>` : "";
     let boxiSection;
     if (!boxi.length) {
       boxiSection = `<p class="page-sub">Pregled tvojih boxov in naročnine.</p>${emptyState("truck", "Še nimaš aktivnih boxov", "Naroči svoje prve boxe v 2 minutah — dostavimo jih na tvoj naslov.", '<button class="btn primary auto" id="newOrderEmpty" style="margin:16px auto 0">Naroči prve boxe</button>')}`;
