@@ -3,7 +3,6 @@
 //
 // Skrivnosti (Supabase -> Project Settings -> Edge Functions -> Secrets):
 //   RESEND_API_KEY   – API ključ iz resend.com
-//   RACUN_FROM       – npr. "Rabimbox <racuni@rabimbox.si>" (domena potrjena v Resend)
 // (SUPABASE_URL in SUPABASE_SERVICE_ROLE_KEY sta na voljo samodejno.)
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -11,8 +10,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-const FROM = Deno.env.get("RACUN_FROM") ?? "Rabimbox <onboarding@resend.dev>";
+const FROM = "Rabimbox <narocila@rabimbox.si>";
 const PANEL_URL = "https://test.rabimbox.si/moj-profil/";
+const WAREHOUSE_URL = "https://skladisce.rabimbox.si/";
 const REVIEW_URL = "https://www.google.com/search?q=Rabimbox+skladi%C5%A1%C4%8Denje+na+zahtevo";
 const OWNER_EMAIL = Deno.env.get("OWNER_EMAIL") ?? "info@rabimbox.si";
 
@@ -178,10 +178,16 @@ Deno.serve(async (req) => {
 
     // Obvestilo LASTNIKU o novem naročilu (fiksni naslov)
     if (tip === "lastnik_narocilo") {
+      if (!isService(req)) throw new Error("Ni dovoljeno.");
       const ref = body.ref;
       if (!ref) throw new Error("Manjka ref.");
       const { data: o } = await sb.from("narocila").select("*").eq("stevilka", ref).order("id", { ascending: false }).limit(1).maybeSingle();
-      if (!o) throw new Error("Naročilo ni najdeno.");
+      if (!o || o.placano !== true) throw new Error("Plačano naročilo ni najdeno.");
+      const dan = "2000-01-01";
+      if (!(await claimEmail(sb, "lastnik_narocilo", "narocilo", o.id, dan))) {
+        return new Response(JSON.stringify({ ok: true, preskoceno: "že poslano" }), { headers: { ...cors, "Content-Type": "application/json" } });
+      }
+      try {
       const tabela = `<table style="width:100%;border-collapse:collapse;margin-top:6px">
         ${vrstica("Številka", o.stevilka || ("#" + o.id))}
         ${vrstica("Storitev", String(o.tip || "").toLowerCase().includes("izpos") ? "Izposoja" : "Skladiščenje")}
@@ -195,9 +201,13 @@ Deno.serve(async (req) => {
         ${o.opis_lokacije ? vrstica("Objekt", o.opis_lokacije) : ""}
         ${vrstica("Plačano", o.placano === true ? "Da" : "Ne")}
       </table>`;
-      const telo = `<p style="font-size:14px;margin:0 0 4px">Novo naročilo na spletni strani:</p>${tabela}${btn(PANEL_URL, "Odpri panel")}`;
+      const telo = `<p style="font-size:14px;margin:0 0 4px">Novo naročilo na spletni strani:</p>${tabela}${btn(WAREHOUSE_URL, "Odpri panel")}`;
       await posljiEmail(OWNER_EMAIL, `Novo naročilo ${o.stevilka || ""} – Rabimbox`, ovoj("Novo naročilo", telo));
       return new Response(JSON.stringify({ ok: true, sent: "lastnik_narocilo" }), { headers: { ...cors, "Content-Type": "application/json" } });
+      } catch (mailError) {
+        await releaseEmail(sb, "lastnik_narocilo", "narocilo", o.id, dan);
+        throw mailError;
+      }
     }
 
     // Obvestilo LASTNIKU o povpraševanju (fiksni naslov)

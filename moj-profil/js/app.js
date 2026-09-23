@@ -15,7 +15,8 @@
     </nav>
     <div class="foot-copy">&copy;2024 Rabimbox. Vse pravice pridržane.</div>
   </footer>`;
-  const state = { sb: null, session: null, kupec: null, tab: "nadzor", hasRacuni: null, boxView: null, narocnine: null };
+  const state = { sb: null, session: null, kupec: null, tab: "nadzor", hasRacuni: null, boxView: null, narocnine: null,
+    needsPassword: /(?:^|[&#?])type=(invite|recovery)(?:&|$)/.test(location.hash + location.search) };
 
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -310,29 +311,25 @@
     const [{ data: boxiAll = [] }, { data: narocila = [] }, narRes] = await Promise.all([q.boxi(), q.narocila(), Promise.resolve(q.narocnine()).catch(() => ({ data: [] }))]);
     state.narocnine = (narRes && narRes.data) || [];
     const boxi = (boxiAll || []).filter((b) => ["pri_stranki", "v_skladiscu"].includes(String(b.status || "").toLowerCase()));
+    state._boxes = boxi;
     const email = (state.session && state.session.user && state.session.user.email) || k.email || "";
-    let neplacani = [], ordersAll = [];
+    let ordersAll = [];
     try {
       const { data: ordersK } = await state.sb.from("narocila").select("*").eq("email", email).order("id", { ascending: false });
-      ordersAll = ordersK || [];
-      neplacani = ordersAll.filter((o) => o.placano !== true && !((o.status || "").toLowerCase().includes("preklic")));
+      ordersAll = (ordersK || []).filter((o) => o.placano === true || o.vir === "rocno");
     } catch (e) {}
     const subStarted = (state.narocnine || []).some((x) => x.datum_od && String(x.status || "").toLowerCase() === "aktivna");
-    const subBadge = subStarted ? subStatusBadge("aktivna") : (neplacani.length ? subStatusBadge("neaktivna") : (ordersAll.length ? subStatusBadge("v dostavi") : subStatusBadge(k.status_narocnine)));
-    const parseAmt = (txt) => { if (!txt) return 0; const before = String(txt).split("/mesec")[0]; const nums = before.match(/\d+(?:[.,]\d+)?/g); if (!nums) return 0; const v = parseFloat(nums[nums.length - 1].replace(/\./g, "").replace(",", ".")); return isNaN(v) ? 0 : v; };
-    const badgeUnpaid = `<span style="background:var(--amber-sf);color:var(--amber);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;margin-left:4px">Ni plačano</span>`;
-    const orderLine = (o) => `<label class="row selectable"><input type="checkbox" class="check unpaid-check" value="${o.id}" data-amount="${parseAmt(o.cena_opis)}" data-ref="${esc(o.stevilka || "")}" />
-      <span class="main"><span class="t">Naročilo ${esc(o.stevilka || ("#" + o.id))} ${badgeUnpaid}</span>
-      <span class="s">${esc(o.paket || "")}${o.cena_opis ? " - " + esc(o.cena_opis) : ""}</span></span></label>`;
-    const neplacanoSection = neplacani.length ? `<div class="card" style="border-radius:6px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h3 style="margin:0">Neplačana naročila</h3><button class="btn outline small" id="selAllUnpaid" type="button">Izberi vsa neplačana</button></div>
-      ${neplacani.map(orderLine).join("")}
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap"><div class="muted" id="unpaidTotal">Izbrano: 0,00 €</div><button class="btn primary" id="payUnpaid" disabled>Plačilo izbranih (0)</button></div>
-    </div>` : "";
+    const subBadge = subStarted ? subStatusBadge("aktivna") : (ordersAll.length ? subStatusBadge("v dostavi") : subStatusBadge(k.status_narocnine));
+    const activeSubs = (state.narocnine || []).filter((x) => x.status === "aktivna");
+    const currentMonthly = activeSubs.reduce((sum, x) => sum + Number(x.cena_mesecna || 0), 0);
+    const nextPrices = activeSubs.filter((x) => x.sprememba_od && x.naslednja_cena != null);
     const skl = boxi.filter(isStorage), naj = boxi.filter((b) => !isStorage(b));
+    if (!state.boxView || (state.boxView === "naj" && !naj.length) || (state.boxView === "skl" && !skl.length)) {
+      state.boxView = naj.length ? "naj" : skl.length ? "skl" : null;
+    }
     const aktivna = narocila.filter((z) => { const s = (z.status || "").toLowerCase(); return !s.includes("zakljuc") && !s.includes("zaključ") && !s.includes("preklic") && !s.includes("dostavlj"); }).length;
     const rowH = (b) => `<label class="row selectable"><input type="checkbox" class="check box-check" value="${b.id}" data-status="${esc(String(b.status || "").toLowerCase())}" data-storage="${isStorage(b) ? 1 : 0}" />
-      <span class="main"><span class="t">Box #${b.id}</span></span>
+      <span class="main"><span class="t">Box ${esc(b.barkoda || ("#" + b.id))}</span></span>
       <span class="end">${boxStatusBadge(b.status)}</span></label>`;
     const group = (title, arr, gkey) => arr.length ? `<div class="section-title">${title} (${arr.length}) <button class="btn outline small" id="selAllBoxes" type="button" style="margin-left:8px">Izberi vse</button></div><div class="card" data-group="${gkey}">${arr.map(rowH).join("")}</div>` : "";
     let boxiSection;
@@ -347,12 +344,13 @@
     }
     const choiceCards = `<div class="nadzor-choice"><div class="nchoice${state.boxView === "naj" ? " active" : ""}" data-view="naj"><span class="cnt">${naj.length}</span><span class="t">Izposoja</span><span class="d">Boxi v najemu</span></div><div class="nchoice${state.boxView === "skl" ? " active" : ""}" data-view="skl"><span class="cnt">${skl.length}</span><span class="t">Skladiščenje</span><span class="d">Boxi v skladišču</span></div></div>`;
     return `${pageHead("nadzor")}
-      ${neplacanoSection}
       ${choiceCards}
       <div class="card"><h3>Naročnina</h3>
         <div class="kv"><span class="k">Status</span><span class="v">${subBadge}</span></div>
         <div class="kv"><span class="k">Začetek</span><span class="v">${fmtDate(narocninaOd())}</span></div>
         <div class="kv"><span class="k">Poteče / obnova</span><span class="v">${fmtDate(narocninaDo())}</span></div>
+        ${currentMonthly > 0 ? `<div class="kv"><span class="k">Trenutna mesečna cena</span><span class="v">${money(currentMonthly)}</span></div>` : ""}
+        ${nextPrices.map((x) => `<div class="kv"><span class="k">Od ${fmtDate(x.sprememba_od)} (${x.naslednje_st_boxov} boxov)</span><span class="v">${money(x.naslednja_cena)} / mesec</span></div>`).join("")}
       </div>
       ${boxiSection}
       <div class="deliver-bar hidden" id="deliverBar"><div class="inner"></div></div>`;
@@ -362,7 +360,7 @@
     if (empty) empty.addEventListener("click", () => { window.location.href = "../narocilo/"; });
     $$(".nchoice[data-view]").forEach((c) => c.addEventListener("click", () => {
       const v = c.getAttribute("data-view");
-      state.boxView = (state.boxView === v) ? null : v;
+      state.boxView = v;
       renderTab();
     }));
     // Gumbi se prilagodijo stanju in storitvi izbranih boxov:
@@ -439,12 +437,11 @@
   async function viewNarocila() {
     const email = (state.session && state.session.user && state.session.user.email) || (state.kupec && state.kupec.email) || "";
     let orders = [];
-    try { const { data } = await state.sb.from("narocila").select("*").eq("email", email).order("id", { ascending: false }); orders = (data || []).filter((o) => !((o.status || "").toLowerCase().includes("preklic"))); } catch (e) {}
+    try { const { data } = await state.sb.from("narocila").select("*").eq("email", email).order("id", { ascending: false }); orders = (data || []).filter((o) => (o.placano === true || o.vir === "rocno") && !((o.status || "").toLowerCase().includes("preklic"))); } catch (e) {}
     let zahteve = [];
     try { const { data } = await q.narocila(); zahteve = data || []; } catch (e) {}
     state._orders = orders;
-    const filterHtml = orders.length > 1 ? `<div class="seg seg-filter" style="max-width:340px;margin-bottom:12px"><button data-filter="all" class="active">Vsa</button><button data-filter="paid">Plačana</button><button data-filter="unpaid">Neplačana</button></div>` : "";
-    const narocilaCard = orders.length ? `<div class="section-title">Moja naročila</div>${filterHtml}<div class="card">${orders.map(narociloRow).join("")}</div>` : "";
+    const narocilaCard = orders.length ? `<div class="section-title">Moja naročila</div><div class="card">${orders.map(narociloRow).join("")}</div>` : "";
     const zahteveCard = zahteve.length ? `<div class="section-title">Zahteve za prevoz</div><div class="card">${zahteve.map(orderRow).join("")}</div>` : "";
     const prazno = (!orders.length && !zahteve.length) ? emptyState("truck", "Še nimaš oddanih naročil", "Ko oddaš naročilo, se bo skupaj s statusom plačila prikazalo tukaj.") : "";
     return `${pageHead("narocila")}<p class="page-sub">Pregled tvojih naročil ter zahtev za dostavo, prevzem in vrnitev boxov.</p>
@@ -453,7 +450,7 @@
   }
   function narociloRow(o) {
     const paid = o.placano === true;
-    const badge = paid ? `<span class="badge green">Plačano</span>` : `<span class="badge amber">Čaka na plačilo</span>`;
+    const badge = paid ? `<span class="badge green">Plačano</span>` : `<span class="badge amber">Ročni vnos</span>`;
     const termin = o.datum_dostave ? (fmtDate(o.datum_dostave) + (o.cas_dostave ? " " + o.cas_dostave : "")) : "";
     return `<div class="row selectable order-row" data-oid="${o.id}" data-paid="${paid ? 1 : 0}"><span class="ico">${ICON.receipt}</span>
       <div class="main"><div class="t">Naročilo ${esc(o.stevilka || ("#" + o.id))} ${badge}</div>
@@ -465,7 +462,7 @@
     const termin = o.datum_dostave ? (fmtDate(o.datum_dostave) + (o.cas_dostave ? " " + o.cas_dostave : "")) : "-";
     const rowKV = (k, v) => (v && v !== "-") ? `<div class="kv"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>` : "";
     openSheet(`<h3>Naročilo ${esc(o.stevilka || ("#" + o.id))}</h3>
-      <div class="kv"><span class="k">Status plačila</span><span class="v">${paid ? '<span class="badge green">Plačano</span>' : '<span class="badge amber">Ni plačano</span>'}</span></div>
+      <div class="kv"><span class="k">Način naročila</span><span class="v">${paid ? '<span class="badge green">Plačano prek spleta</span>' : '<span class="badge amber">Ročni vnos</span>'}</span></div>
       ${rowKV("Storitev", o.tip)}${rowKV("Paket", o.paket)}${rowKV("Cena", o.cena_opis)}${rowKV("Termin", termin)}
       ${rowKV("Naslov", o.naslov)}${rowKV("Poštna", o.postna_stevilka)}${rowKV("Mesto", o.mesto)}${rowKV("Telefon", o.telefon)}
       <div class="rowflex mt"><a class="btn primary" href="../narocilo/">Ponovi naročilo</a><button class="btn outline-2" type="button" data-close>Zapri</button></div>`);
@@ -487,6 +484,21 @@
       <div class="s">Oddano: ${fmtDate(z.datum_zahteve, true)}${z.datum_dostave ? " · Termin: " + fmtDate(z.datum_dostave) : ""}</div>
       ${reqProgress(z.status, pickup)}</div>
       <div class="end">${reqStatusBadge(z.status)}</div></div>`;
+  }
+  function showSetPassword() {
+    render(`<div class="auth-wrap"><div class="auth-logo"><img src="${LOGO}" alt="Rabimbox" /><h1>Nastavi geslo</h1></div>
+      <div class="auth-card"><p>Za dostop do Mojega profila nastavi geslo.</p>
+        <form id="setPasswordForm"><div class="field"><label>Novo geslo</label>
+        <input id="newPassword" type="password" minlength="6" autocomplete="new-password" required /></div>
+        <button class="btn primary" type="submit">Shrani geslo</button></form><div id="setPasswordError"></div></div></div>`);
+    $("#setPasswordForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const { error } = await state.sb.auth.updateUser({ password: $("#newPassword").value });
+      if (error) { $("#setPasswordError").innerHTML = `<div class="alert err">${esc(error.message)}</div>`; return; }
+      state.needsPassword = false;
+      history.replaceState({}, "", location.pathname);
+      await routeBySession();
+    });
   }
   function todayISO() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function minOrderDateISO() {
@@ -528,7 +540,7 @@
       <div class="field"><label>Datum</label><input type="date" id="oDate" min="${minOrderDateISO()}" /><div class="hint">Najzgodnejši termin je čez 3 delovne dni, od ponedeljka do petka.</div></div>
       <div class="field"><label>Ura</label><select id="oTime"><option value="">Najprej izberi datum</option></select><div class="hint" id="oTimeHint"></div></div>
       <div class="field"><label>Opomba</label><textarea id="oNote" rows="3" placeholder="Posebnosti, ..."></textarea></div>
-      ${ids.length ? `<div class="hint" style="margin:-6px 0 12px">Izbrani boxi: ${ids.map((i) => "#" + i).join(", ")}</div>` : ""}
+      ${ids.length ? `<div class="hint" style="margin:-6px 0 12px">Izbrani boxi: ${ids.map((i) => esc((((state._boxes || []).find((b) => Number(b.id) === Number(i)) || {}).barkoda) || ("#" + i))).join(", ")}</div>` : ""}
       <button class="btn primary" type="submit" id="oSubmit">${esc(a.submit)}</button>
       <button class="btn ghost mt" type="button" data-close>Prekliči</button></form>`);
     const form = $("#orderForm"); form.dataset.action = action || "vracilo"; form.dataset.ids = JSON.stringify(ids);
@@ -678,12 +690,17 @@
       render(`<div class="auth-wrap"><div class="auth-card"><div class="alert err">Ni bilo mogoče naložiti Supabase knjižnice (preveri internetno povezavo).</div></div></div>`); return;
     }
     state.sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
-    state.sb.auth.onAuthStateChange(async (_e, session) => { state.session = session; await routeBySession(); });
+    state.sb.auth.onAuthStateChange(async (event, session) => {
+      state.session = session;
+      if (event === "PASSWORD_RECOVERY") state.needsPassword = true;
+      await routeBySession();
+    });
     const { data } = await state.sb.auth.getSession();
     state.session = data.session; await routeBySession();
   }
   async function routeBySession() {
     if (!state.session) { state.kupec = null; showAuth("login"); return; }
+    if (state.needsPassword) { showSetPassword(); return; }
     if (!state.kupec) { APP.innerHTML = `<div class="boot"><div class="spinner"></div></div>`; await loadKupec(); }
     if (!state.kupec) { showNotLinked(); return; }
     await handlePlacilo();

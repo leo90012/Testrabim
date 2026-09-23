@@ -416,36 +416,24 @@
         if(li2&&li2.error){alert("Ta e-naslov je že registriran. Klikni 'Imam račun' in se prijavi v odprtem oknu.");if(btn){btn.disabled=false;btn.textContent="Plačilo";}return;}
       }
     }
-    var now=new Date();
-    var ref="RB-"+now.getFullYear()+"-"+now.getTime().toString().slice(-8);
     var rec={tip:s.tip,paket:planLabel(),st_boxov:(s.tip==="izposoja"?planObj().boxes:s.stBoxov),
       cena_opis:cenaOpis(),stopnice:false,krhko:false,pomoc_polnjenje:s.extras.pomoc,
       opis_lokacije:("Vrsta objekta: "+(s.opis||"-")+" | Nadstropje: "+(s.nadstropje||"-")+" | Dvigalo: "+(s.extras.dvigalo?"Da":"Ne")),naslov:s.naslov||null,enota:null,postna_stevilka:s.postna||null,mesto:s.mesto||null,telefon:s.telefon||null,
       datum_dostave:s.datum||null,cas_dostave:s.cas||null,ime:s.ime||null,priimek:s.priimek||null,
-      podjetje:s.podjetje||null,davcna:s.davcna||null,email:s.email,stevilka:ref,placano:false,status:"nova"};
+      podjetje:s.podjetje||null,davcna:s.davcna||null,email:s.email};
     try{
       if(!sb)throw new Error("Supabase ni na voljo.");
-      var r=await sb.from("narocila").insert(rec);
-      if(r.error)throw r.error;
-      try{ sb.functions.invoke("poslji-obvestilo",{body:{tip:"lastnik_narocilo",ref:ref}}); }catch(e){}
-      // Stripe plačilo (Checkout) – preusmeritev na varno plačilno stran
-      try{
-        var scr=null,lastErr=null;
-        var _slugs=["rapid-api","stripe-checkout","Stripe-checkout"];
-        for(var _i=0;_i<_slugs.length;_i++){
-          try{
-            scr=await sb.functions.invoke(_slugs[_i],{body:{ref:ref,pageUrl:location.origin+location.pathname}});
-            if(scr&&!scr.error&&scr.data&&scr.data.url){window.location.href=scr.data.url;return;}
-            lastErr=scr&&scr.error?(scr.error.message||"stripe"):"stripe";
-          }catch(_e){lastErr=(_e&&_e.message)?_e.message:String(_e);}
-        }
-        throw new Error(lastErr||"stripe");
-      }catch(se){
-        console.warn("Stripe checkout ni uspel (preusmeritev preskočena):", (se&&se.message)?se.message:se);
-        alert("Naročilo je shranjeno, plačilo pa trenutno ni na voljo. Predračuna ne pošiljamo. Poskusi plačilo znova v Mojem računu.");
-        window.location.href="../moj-profil/";
+      var scr=null,lastErr=null;
+      var _slugs=["rapid-api","stripe-checkout","Stripe-checkout"];
+      for(var _i=0;_i<_slugs.length;_i++){
+        try{
+          scr=await sb.functions.invoke(_slugs[_i],{body:{order:rec,pageUrl:location.origin+location.pathname}});
+          if(scr&&!scr.error&&scr.data&&scr.data.url){window.location.href=scr.data.url;return;}
+          lastErr=scr&&scr.error?(scr.error.message||"stripe"):"stripe";
+        }catch(_e){lastErr=(_e&&_e.message)?_e.message:String(_e);}
       }
-    }catch(e){alert("Napaka pri oddaji: "+(e.message||e));btn.disabled=false;btn.textContent="Plačilo";}
+      throw new Error(lastErr||"Plačilo trenutno ni na voljo.");
+    }catch(e){alert("Naročilo ni bilo oddano: "+(e.message||e));btn.disabled=false;btn.textContent="Plačilo";}
   }
 
   function viewDone(){

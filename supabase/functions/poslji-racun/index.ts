@@ -23,7 +23,7 @@ const FIRMA = {
   iban: "SI56 0201 2026 2090 861",
   swift: "LJBASI2X",
   banka: "NLB d.d.",
-  email: "info@rabimbox.si",
+  email: "narocila@rabimbox.si",
 };
 
 const cors = {
