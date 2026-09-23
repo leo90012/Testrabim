@@ -96,6 +96,20 @@ create trigger trg_sync_datum_dostave
   after update of datum_dostave on public.narocila
   for each row execute function public.rb_sync_datum_po_spremembi_dostave();
 
+-- Skupni koledar: poleg prvotnih naročil upoštevaj tudi zahteve za
+-- prevoz. Ura zahteve je shranjena v opombi kot "Ura: 10:00".
+create or replace function public.zasedeni_termini(d date)
+returns setof text language sql stable security definer set search_path = public as $$
+  select cas_dostave from public.narocila
+    where datum_dostave = d and cas_dostave is not null
+  union
+  select substring(opomba from 'Ura:[[:space:]]*([0-9]{2}:[0-9]{2})')
+    from public.zahteve_dostave
+    where (datum_dostave at time zone 'Europe/Ljubljana')::date = d
+      and coalesce(status, '') not in ('zakljuceno', 'preklicano')
+      and substring(opomba from 'Ura:[[:space:]]*([0-9]{2}:[0-9]{2})') is not null;
+$$;
+
 -- Ena e-posta na stranko in spremembo statusa. Iz prejsnjega statusa
 -- razlocimo prvo dostavo od vrnitve boksov iz skladisca.
 create or replace function public.rb_notify_box_status()
