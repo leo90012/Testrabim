@@ -95,6 +95,16 @@
     return `<span class="badge ${c}">${esc(s || "nova")}</span>`;
   }
 
+  function reqProgress(s, pickup) {
+    const key = String(s || "nova").toLowerCase();
+    const stage = key === "zakljuceno" || key === "zakljucena" ? 3
+      : key === "pri_stranki" || key === "v_skladiscu" ? 2
+      : key === "caka_dostavo" || key === "potrjeno" || key === "potrjena" ? 1 : 0;
+    const steps = ["Oddano", "Potrjeno", pickup ? "Prevzeto" : "Dostavljeno", "Zaključeno"];
+    return `<div class="s">${steps.map((label, i) =>
+      `<span${i === stage ? ' style="font-weight:700;color:var(--heading)"' : ""}>${i < stage ? "✓ " : ""}${label}</span>`
+    ).join(' <span aria-hidden="true">→</span> ')}</div>`;
+  }
   const SUB_STATUS = {
     aktivna:    { label: "Aktivna",    color: "green" },
     pavza:      { label: "Na pavzi",   color: "amber" },
@@ -471,13 +481,11 @@
   }
   function orderRow(z) {
     const vrsta = String(z.opomba || "").split(" - ")[0] || "Prevoz";
-    const status = String(z.status || "nova").toLowerCase();
-    const zakljuceno = status === "zakljuceno" || status === "zakljucena";
-    const oznaka = status === "pri_stranki" ? "Dostavljeno" : status === "v_skladiscu" ? "Prevzeto v skladišče" : null;
+    const pickup = /skladišče|vračilo|prevzem/i.test(vrsta);
     return `<div class="row"><span class="ico">${ICON.truck}</span>
       <div class="main"><div class="t">${esc(vrsta)} #${z.id}</div>
       <div class="s">Oddano: ${fmtDate(z.datum_zahteve, true)}${z.datum_dostave ? " · Termin: " + fmtDate(z.datum_dostave) : ""}</div>
-      ${zakljuceno || oznaka ? `<div class="s">${zakljuceno ? "Zaključeno" : oznaka}</div>` : ""}</div>
+      ${reqProgress(z.status, pickup)}</div>
       <div class="end">${reqStatusBadge(z.status)}</div></div>`;
   }
   function todayISO() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
