@@ -378,25 +378,35 @@ where not exists (
   select 1 from cron.job where jobname='rabimbox-obracun-obnova'
 );
 
--- Stara neplacana narocila ostanejo le kot sled v podatkovni bazi.
--- Aktualno sejo lahko Stripe se vedno potrdi; starejse odpovemo in sprostimo rezervacije.
-with stara as (
-  select n.id from public.narocila n
-  where n.placano=false and n.vir='splet' and n.created_at<now()-interval '24 hours'
-    and n.status='nova'
-)
-update public.skatle s set status='na_zalogi',kupec_id=null,narocnina_id=null,
-  tip_storitve=null,updated_at=now()
-where s.narocnina_id in (
-  select x.id from public.narocnine x join stara n on n.id=x.narocilo_id
-);
-update public.narocnine x set status='preklicana',updated_at=now()
-where x.narocilo_id in (
-  select id from public.narocila
+-- Pocistimo stare rezervacije iz prejsnje izvedbe; novi checkout ustvari le osnutek.
+create or replace function public.rb_cleanup_unpaid_legacy()
+returns integer language plpgsql security definer set search_path = public as $$
+declare v_ids bigint[]; v_count integer;
+begin
+  select array_agg(id) into v_ids from public.narocila
   where placano=false and vir='splet' and created_at<now()-interval '24 hours'
-    and status='nova'
+    and status='nova';
+  if v_ids is null then return 0; end if;
+  update public.skatle s set status='na_zalogi',kupec_id=null,narocnina_id=null,
+    tip_storitve=null,updated_at=now()
+  where s.narocnina_id in (
+    select id from public.narocnine where narocilo_id=any(v_ids)
+  );
+  update public.narocnine set status='preklicana',updated_at=now()
+  where narocilo_id=any(v_ids);
+  update public.narocila set status='preklicano' where id=any(v_ids);
+  get diagnostics v_count=row_count;
+  return v_count;
+end;
+$$;
+revoke all on function public.rb_cleanup_unpaid_legacy() from public,anon,authenticated;
+select cron.schedule(
+  'rabimbox-ciscenje-neplacanih',
+  '15 * * * *',
+  'select public.rb_cleanup_unpaid_legacy();'
+)
+where not exists (
+  select 1 from cron.job where jobname='rabimbox-ciscenje-neplacanih'
 );
-update public.narocila set status='preklicano'
-where placano=false and vir='splet' and created_at<now()-interval '24 hours'
-  and status='nova';
+select public.rb_cleanup_unpaid_legacy();
 commit;
