@@ -53,8 +53,6 @@ Deno.serve(async (req) => {
       if (paid && ref0) {
         const { data: o0 } = await sb.from("narocila").select("*").eq("stevilka", ref0).order("id", { ascending: false }).limit(1).maybeSingle();
         await sb.from("narocila").update({ placano: true }).eq("stevilka", ref0);
-        // Potrditev plačila po e-pošti (neobvezno; ne blokira odgovora)
-        try { await fetch(SUPABASE_URL + "/functions/v1/poslji-obvestilo", { method: "POST", headers: { "Authorization": "Bearer " + SERVICE_ROLE, "apikey": SERVICE_ROLE, "Content-Type": "application/json" }, body: JSON.stringify({ tip: "placilo", ref: ref0 }) }); } catch (_) { /* ignore */ }
         if (o0) {
           const { data: obstoj } = await sb.from("racuni").select("id").eq("stevilka", ref0).limit(1).maybeSingle();
           if (!obstoj) {
@@ -65,9 +63,11 @@ Deno.serve(async (req) => {
             const zap = new Date(); zap.setDate(zap.getDate() + 8);
             let kupec_id: number | null = null;
             try { const { data: k } = await sb.from("kupci").select("id").eq("email", o0.email).limit(1).maybeSingle(); if (k) kupec_id = k.id; } catch (_) { /* ignore */ }
-            await sb.from("racuni").insert({ stevilka: ref0, kupec_id, osnova, ddv, znesek: total, valuta: "EUR", opis: (o0.paket || "Rabimbox") + " - prvi mesec", status: "placan", email: o0.email, ime: o0.ime, priimek: o0.priimek, podjetje: o0.podjetje, davcna: o0.davcna, datum_izdaje: d(new Date()), datum_zapadlosti: d(zap) });
-            try { await fetch(SUPABASE_URL + "/functions/v1/poslji-racun", { method: "POST", headers: { "Authorization": "Bearer " + SERVICE_ROLE, "apikey": SERVICE_ROLE, "Content-Type": "application/json" }, body: JSON.stringify({ stevilka: ref0 }) }); } catch (_) { /* ignore */ }
+            const { error: invoiceError } = await sb.from("racuni").insert({ stevilka: ref0, narocilo_id: o0.id, kupec_id, osnova, ddv, znesek: total, valuta: "EUR", opis: (o0.paket || "Rabimbox") + " - prvi mesec", status: "placan", email: o0.email, ime: o0.ime, priimek: o0.priimek, podjetje: o0.podjetje, davcna: o0.davcna, datum_izdaje: d(new Date()), datum_zapadlosti: d(zap) });
+            if (invoiceError && invoiceError.code !== "23505") throw invoiceError;
           }
+          const mail = await fetch(SUPABASE_URL + "/functions/v1/poslji-obvestilo", { method: "POST", headers: { "Authorization": "Bearer " + SERVICE_ROLE, "apikey": SERVICE_ROLE, "Content-Type": "application/json" }, body: JSON.stringify({ tip: "placilo", ref: ref0 }) });
+          if (!mail.ok) console.error("Potrditveni e-mail:", await mail.text());
         }
       }
       return new Response(JSON.stringify({ ok: true, paid }), { headers: { ...cors, "Content-Type": "application/json" } });

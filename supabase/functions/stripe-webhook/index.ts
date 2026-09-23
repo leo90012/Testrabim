@@ -1,8 +1,8 @@
 // Rabimbox – Supabase Edge Function: stripe-webhook
 // Stripe pokliče to funkcijo ob dogodku plačila. Ob 'checkout.session.completed':
-//   1) naročilo označi kot plačano (narocila.placano = true, status = 'placano'),
+//   1) naročilo označi kot plačano,
 //   2) ustvari račun (racuni) z osnovo + 22% DDV,
-//   3) sproži pošiljanje računa po e-pošti (funkcija poslji-racun).
+//   3) sproži eno potrditveno e-pošto z računom v priponki.
 //
 // Skrivnosti (Supabase -> Project Settings -> Edge Functions -> Secrets):
 //   STRIPE_SECRET_KEY      – sk_test_... / sk_live_...
@@ -52,39 +52,40 @@ Deno.serve(async (req) => {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
       const ref = session?.metadata?.ref;
-      if (ref) {
+      if (ref && session.payment_status === "paid") {
         const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
         const { data: o } = await sb.from("narocila").select("*").eq("stevilka", ref).order("id", { ascending: false }).limit(1).maybeSingle();
 
         // 1) označi plačano
-        await sb.from("narocila").update({ placano: true, status: "placano" }).eq("stevilka", ref);
+        await sb.from("narocila").update({ placano: true }).eq("stevilka", ref);
 
         if (o) {
           // 2) ustvari račun (če še ne obstaja)
           const { data: obstoj } = await sb.from("racuni").select("id").eq("stevilka", ref).limit(1).maybeSingle();
           if (!obstoj) {
-            const total = znesekZa(o);
+            const total = typeof session.amount_total === "number" ? session.amount_total / 100 : znesekZa(o);
             const osnova = Math.round((total / 1.22) * 100) / 100;
             const ddv = Math.round((total - osnova) * 100) / 100;
             const zap = new Date(); zap.setDate(zap.getDate() + 8);
             // poišči kupca po e-pošti
             let kupec_id: number | null = null;
             try { const { data: k } = await sb.from("kupci").select("id").eq("email", o.email).limit(1).maybeSingle(); if (k) kupec_id = k.id; } catch (_) { /* ignore */ }
-            await sb.from("racuni").insert({
-              stevilka: ref, kupec_id, osnova, ddv, znesek: total, valuta: "EUR",
+            const { error: invoiceError } = await sb.from("racuni").insert({
+              stevilka: ref, narocilo_id: o.id, kupec_id, osnova, ddv, znesek: total, valuta: "EUR",
               opis: (o.paket || "Rabimbox") + " - prvi mesec", status: "placan",
               email: o.email, ime: o.ime, priimek: o.priimek, podjetje: o.podjetje, davcna: o.davcna,
               datum_izdaje: d(new Date()), datum_zapadlosti: d(zap),
             });
-            // 3) pošlji račun po e-pošti (funkcija poslji-racun)
-            try {
-              await fetch(SUPABASE_URL + "/functions/v1/poslji-racun", {
-                method: "POST",
-                headers: { "Authorization": "Bearer " + SERVICE_ROLE, "apikey": SERVICE_ROLE, "Content-Type": "application/json" },
-                body: JSON.stringify({ stevilka: ref }),
-              });
-            } catch (_) { /* e-mail ni ključen za potrditev plačila */ }
+            if (invoiceError && invoiceError.code !== "23505") throw invoiceError;
           }
+          // Enaka pot kot potrditev iz brskalnika; pogojna sprememba statusa
+          // računa v poslji-obvestilo prepreči dvojno e-pošto.
+          const mail = await fetch(SUPABASE_URL + "/functions/v1/poslji-obvestilo", {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + SERVICE_ROLE, "apikey": SERVICE_ROLE, "Content-Type": "application/json" },
+            body: JSON.stringify({ tip: "placilo", ref }),
+          });
+          if (!mail.ok) console.error("Potrditveni e-mail:", await mail.text());
         }
       }
     }

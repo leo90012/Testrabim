@@ -1,8 +1,5 @@
 // Rabimbox – Supabase Edge Function: poslji-obvestilo
-// Pošlje stranki e-obvestilo (prek Resend). Trije tipi:
-//   tip = "narocilo" -> potrditev oddanega naročila (podatke prebere iz narocila po ref)
-//   tip = "placilo"  -> potrditev prejetega plačila (iz narocila po ref)
-//   tip = "obnova"   -> opomnik za obnovo naročnine (email, ime, datum_do, paket v telesu)
+// Pošlje potrditve plačila in obvestila o dostavi/prevzemu prek Resend.
 //
 // Skrivnosti (Supabase -> Project Settings -> Edge Functions -> Secrets):
 //   RESEND_API_KEY   – API ključ iz resend.com
@@ -15,17 +12,13 @@ const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const FROM = Deno.env.get("RACUN_FROM") ?? "Rabimbox <onboarding@resend.dev>";
-const PANEL_URL = "https://leo90012.github.io/Rabimb/Moj-profil/index.html";
+const PANEL_URL = "https://test.rabimbox.si/moj-profil/";
+const REVIEW_URL = "https://www.google.com/search?q=Rabimbox+skladi%C5%A1%C4%8Denje+na+zahtevo";
 const OWNER_EMAIL = Deno.env.get("OWNER_EMAIL") ?? "info@rabimbox.si";
 
-// Vloga klicatelja iz Authorization JWT (za omejitev občutljivih tipov na service_role)
-function callerRole(req: Request): string {
-  try {
-    const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    const p = tok.split(".")[1];
-    const j = JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/")));
-    return j.role || "";
-  } catch (_) { return ""; }
+function isService(req: Request): boolean {
+  const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  return !!SERVICE_ROLE && tok === SERVICE_ROLE;
 }
 
 const cors = {
@@ -72,14 +65,23 @@ function btn(href: string, label: string): string {
   return `<div style="margin:22px 0 6px"><a href="${esc(href)}" style="display:inline-block;background:#6ec1e4;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px;font-size:14px">${esc(label)}</a></div>`;
 }
 
-async function posljiEmail(to: string, subject: string, html: string) {
+async function posljiEmail(to: string, subject: string, html: string, attachments: Array<{filename:string;content:string}> = []) {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: FROM, to: [to], subject, html }),
+    body: JSON.stringify({ from: FROM, to: [to], subject, html, ...(attachments.length ? { attachments } : {}) }),
   });
   if (!res.ok) throw new Error("Resend napaka: " + (await res.text()));
   return await res.json();
+}
+async function claimEmail(sb: ReturnType<typeof createClient>, tip: string, vir: string, virId: number, datum: string) {
+  const { error } = await sb.from("email_obvestila").insert({ tip, vir, vir_id: virId, datum });
+  if (error && error.code === "23505") return false;
+  if (error) throw error;
+  return true;
+}
+async function releaseEmail(sb: ReturnType<typeof createClient>, tip: string, vir: string, virId: number, datum: string) {
+  await sb.from("email_obvestila").delete().match({ tip, vir, vir_id: virId, datum });
 }
 
 Deno.serve(async (req) => {
@@ -90,12 +92,23 @@ Deno.serve(async (req) => {
     const tip = String(body.tip || "");
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    if (tip === "narocilo" || tip === "placilo") {
+    if (tip === "placilo") {
+      if (!isService(req)) throw new Error("Ni dovoljeno.");
       const ref = body.ref;
       if (!ref) throw new Error("Manjka ref.");
       const { data: o } = await sb.from("narocila").select("*").eq("stevilka", ref).order("id", { ascending: false }).limit(1).maybeSingle();
       if (!o || !o.email) throw new Error("Naročilo ali e-naslov ni najden.");
-      const ime = o.ime ? `, ${esc(o.ime)}` : "";
+      if (o.placano !== true) throw new Error("Plačilo še ni potrjeno.");
+      const { data: racun, error: racunError } = await sb.from("racuni").select("id,status,stevilka").eq("stevilka", ref).limit(1).maybeSingle();
+      if (racunError || !racun) throw new Error("Plačani račun še ni pripravljen.");
+      if (racun.status === "poslan" || racun.status === "posiljanje") return new Response(JSON.stringify({ ok: true, preskoceno: "potrditev je že poslana ali v obdelavi" }), { headers: { ...cors, "Content-Type": "application/json" } });
+      const { data: claim, error: claimError } = await sb.from("racuni").update({ status: "posiljanje" }).eq("id", racun.id).eq("status", racun.status).select("id").maybeSingle();
+      if (claimError || !claim) return new Response(JSON.stringify({ ok: true, preskoceno: "potrditev že obdeluje drug klic" }), { headers: { ...cors, "Content-Type": "application/json" } });
+      try {
+        const pdfRes = await fetch(SUPABASE_URL + "/functions/v1/poslji-racun", { method: "POST", headers: { "Authorization": "Bearer " + SERVICE_ROLE, "apikey": SERVICE_ROLE, "Content-Type": "application/json" }, body: JSON.stringify({ stevilka: ref, download: true }) });
+        const pdf = await pdfRes.json();
+        if (!pdfRes.ok || !pdf.pdf) throw new Error("Računa ni bilo mogoče pripraviti.");
+        const ime = o.ime ? ` ${esc(o.ime)}` : "";
       const tabela = `<table style="width:100%;border-collapse:collapse;margin-top:6px">
         ${vrstica("Številka naročila", o.stevilka || ("#" + o.id))}
         ${vrstica("Storitev", String(o.tip || "").toLowerCase().includes("izpos") ? "Izposoja" : "Skladiščenje")}
@@ -105,20 +118,16 @@ Deno.serve(async (req) => {
         ${o.naslov ? vrstica("Naslov", o.naslov + (o.mesto ? ", " + o.mesto : "")) : ""}
       </table>`;
 
-      if (tip === "narocilo") {
-        const telo = `<p style="font-size:14px;line-height:1.6;margin:0 0 4px">Pozdravljeni${ime}, hvala za naročilo! Prejeli smo ga in ga obdelujemo.</p>
+        const telo = `<p style="font-size:14px;line-height:1.6;margin:0 0 4px">Pozdravljeni${ime}, zahvaljujemo se vam za vaše naročilo.</p>
           ${tabela}
-          <p style="font-size:13.5px;color:#7b8794;line-height:1.6;margin:16px 0 0">Kmalu vas kontaktiramo za potrditev termina. Podrobnosti si lahko ogledate v svojem računu.</p>
+          <p style="font-size:13.5px;color:#7b8794;line-height:1.6;margin:16px 0 0">Račun se nahaja v priponki.</p>
           ${btn(PANEL_URL, "Moj račun")}`;
-        await posljiEmail(o.email, `Potrditev naročila ${o.stevilka || ""} – Rabimbox`, ovoj("Naročilo je prejeto", telo));
-        return new Response(JSON.stringify({ ok: true, sent: "narocilo" }), { headers: { ...cors, "Content-Type": "application/json" } });
-      } else {
-        const telo = `<p style="font-size:14px;line-height:1.6;margin:0 0 4px">Pozdravljeni${ime}, vaše plačilo smo uspešno prejeli. Hvala!</p>
-          ${tabela}
-          <p style="font-size:13.5px;color:#7b8794;line-height:1.6;margin:16px 0 0">Račun vam pošiljamo v ločenem e-sporočilu. Kmalu vas kontaktiramo glede termina.</p>
-          ${btn(PANEL_URL, "Moj račun")}`;
-        await posljiEmail(o.email, `Plačilo prejeto – naročilo ${o.stevilka || ""} – Rabimbox`, ovoj("Plačilo je potrjeno", telo));
+        await posljiEmail(o.email, "Naročilo je potrjeno – Rabimbox", ovoj("Naročilo je potrjeno", telo), [{ filename: pdf.filename || `Racun-${ref}.pdf`, content: pdf.pdf }]);
+        await sb.from("racuni").update({ status: "poslan" }).eq("id", racun.id);
         return new Response(JSON.stringify({ ok: true, sent: "placilo" }), { headers: { ...cors, "Content-Type": "application/json" } });
+      } catch (e) {
+        await sb.from("racuni").update({ status: racun.status }).eq("id", racun.id).eq("status", "posiljanje");
+        throw e;
       }
     }
 
@@ -146,6 +155,7 @@ Deno.serve(async (req) => {
 
     // Paketni opomnik: pošlje vsem naročninam, ki se iztečejo čez N dni (privzeto 5).
     if (tip === "obnova_batch") {
+      if (!isService(req)) throw new Error("Ni dovoljeno.");
       const dni = Number(body.dni) || 5;
       const cilj = new Date(); cilj.setDate(cilj.getDate() + dni);
       const ciljStr = cilj.toISOString().slice(0, 10);
@@ -206,20 +216,85 @@ Deno.serve(async (req) => {
 
     // Obvestilo STRANKI ob dostavi/prevzemu (samo service_role -> DB trigger)
     if (tip === "dostava" || tip === "prevzem") {
-      if (callerRole(req) !== "service_role") throw new Error("Ni dovoljeno.");
+      if (!isService(req)) throw new Error("Ni dovoljeno.");
       const to = body.email;
       if (!to) throw new Error("Manjka email.");
-      const ime = body.ime ? `, ${esc(body.ime)}` : "";
+      const ime = body.ime ? ` ${esc(body.ime)}` : "";
       const jeDost = tip === "dostava";
-      const naslovE = jeDost ? "Boxi so dostavljeni" : "Boxi so prevzeti";
-      const besedilo = jeDost
-        ? "vaši boxi so bili dostavljeni. Veselimo se sodelovanja!"
-        : "vaše boxe smo prevzeli in jih varno skladiščimo.";
+      const vrnitev = jeDost && body.faza === "vrnitev";
+      const naslovE = vrnitev ? "Vaši boxi so ponovno pri vas" : jeDost ? "Boxi so pri vas" : "Boxi so prevzeti v skladišče";
+      const stevilo = Number(body.st_boksov) > 0 ? ` (${Number(body.st_boksov)} boxov)` : "";
+      const besedilo = vrnitev
+        ? "vaše boxe smo vam ponovno dostavili. Hvala, ker uporabljate Rabimbox."
+        : jeDost ? "vaše boxe smo dostavili na dogovorjeni naslov. Zdaj so pri vas."
+        : "vaše boxe smo prevzeli in jih shranili v naše skladišče.";
       const telo = `<p style="font-size:14px;line-height:1.6;margin:0 0 6px">Pozdravljeni${ime}, ${besedilo}</p>
-        <p style="font-size:13.5px;color:#7b8794;line-height:1.6;margin:0">Stanje boxov si lahko ogledate v svojem računu.</p>
+        <p style="font-size:13.5px;color:#7b8794;line-height:1.6;margin:0">Stanje${stevilo} lahko spremljate v Mojem računu.</p>
         ${btn(PANEL_URL, "Moj račun")}`;
       await posljiEmail(to, naslovE + " – Rabimbox", ovoj(naslovE, telo));
       return new Response(JSON.stringify({ ok: true, sent: tip }), { headers: { ...cors, "Content-Type": "application/json" } });
+    }
+
+    if (tip === "dostava_opomnik_batch") {
+      if (!isService(req)) throw new Error("Ni dovoljeno.");
+      const jutri = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Ljubljana", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000));
+      let poslano = 0;
+      const { data: orders, error: ordersError } = await sb.from("narocila").select("id,ime,email,stevilka,datum_dostave,cas_dostave,naslov,postna_stevilka,mesto,status,placano").eq("datum_dostave", jutri).eq("placano", true).in("status", ["nova", "caka_dostavo"]);
+      if (ordersError) throw ordersError;
+      const pojutrisnjem = new Date(jutri + "T00:00:00Z");
+      pojutrisnjem.setUTCDate(pojutrisnjem.getUTCDate() + 1);
+      const { data: requests, error: requestsError } = await sb.from("zahteve_dostave").select("id,kupec_id,datum_dostave,opomba,status")
+        .gte("datum_dostave", jutri + "T00:00:00Z")
+        .lt("datum_dostave", pojutrisnjem.toISOString())
+        .in("status", ["nova", "caka_dostavo"]);
+      if (requestsError) throw requestsError;
+      const entries: Array<{vir:string;id:number;email:string;ime:string;vrsta:string;datum:string;ura:string;naslov:string}> = [];
+      for (const o of orders || []) if (o.email) entries.push({ vir: "narocilo", id: o.id, email: o.email, ime: o.ime || "", vrsta: "dostavo", datum: jutri, ura: o.cas_dostave || "", naslov: [o.naslov, o.postna_stevilka, o.mesto].filter(Boolean).join(", ") });
+      for (const z of requests || []) {
+        const { data: k } = await sb.from("kupci").select("email,ime").eq("id", z.kupec_id).limit(1).maybeSingle();
+        if (!k?.email) continue;
+        const details = String(z.opomba || "");
+        const vrsta = details.split(" - ")[0] || "prevoz";
+        const naslov = /Naslov:\s*([^|]+)/i.exec(details)?.[1]?.trim() || "";
+        const ura = /Ura:\s*([^|]+)/i.exec(details)?.[1]?.trim() || "";
+        entries.push({ vir: "zahteva", id: z.id, email: k.email, ime: k.ime || "", vrsta, datum: jutri, ura, naslov });
+      }
+      for (const e of entries) {
+        if (!(await claimEmail(sb, "opomnik_dostave", e.vir, e.id, e.datum))) continue;
+        try {
+          const telo = `<p style="font-size:14px;line-height:1.6">Pozdravljeni${e.ime ? " " + esc(e.ime) : ""},</p>
+            <p style="font-size:14px;line-height:1.6">spominjamo vas, da je vaš ${esc(e.vrsta)} predviden jutri.</p>
+            <table style="width:100%">${vrstica("Datum", fmtDate(e.datum))}${e.ura ? vrstica("Ura", e.ura) : ""}${e.naslov ? vrstica("Naslov", e.naslov) : ""}</table>
+            <p style="font-size:13.5px;line-height:1.6">Če želite sporočiti spremembo, nas kontaktirajte na info@rabimbox.si.</p>${btn(PANEL_URL, "Moj račun")}`;
+          await posljiEmail(e.email, "Opomnik za jutrišnji prevoz – Rabimbox", ovoj("Jutri smo pri vas", telo));
+          poslano++;
+        } catch (err) { await releaseEmail(sb, "opomnik_dostave", e.vir, e.id, e.datum); console.error("Opomnik dostave:", err); }
+      }
+      return new Response(JSON.stringify({ ok: true, sent: "dostava_opomnik_batch", poslano }), { headers: { ...cors, "Content-Type": "application/json" } });
+    }
+
+    if (tip === "zakljucek") {
+      if (!isService(req)) {
+        const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+        const { data: auth } = await sb.auth.getUser(tok);
+        if (!auth.user) throw new Error("Ni dovoljeno.");
+        const { data: staff } = await sb.from("osebje").select("user_id").eq("user_id", auth.user.id).limit(1).maybeSingle();
+        if (!staff) throw new Error("Ni dovoljeno.");
+      }
+      const id = Number(body.narocilo_id);
+      if (!Number.isInteger(id) || id < 1) throw new Error("Manjka narocilo_id.");
+      const { data: o } = await sb.from("narocila").select("id,ime,email,status").eq("id", id).limit(1).maybeSingle();
+      if (!o || !o.email || o.status !== "zakljuceno") throw new Error("Naročilo še ni zaključeno.");
+      const datum = "1970-01-01";
+      if (!(await claimEmail(sb, "zakljucek", "narocilo", id, datum))) return new Response(JSON.stringify({ ok: true, preskoceno: "zahvala je že poslana" }), { headers: { ...cors, "Content-Type": "application/json" } });
+      try {
+        const telo = `<p style="font-size:14px;line-height:1.6">Pozdravljeni${o.ime ? " " + esc(o.ime) : ""},</p>
+          <p style="font-size:14px;line-height:1.6">zahvaljujemo se vam za zaupanje. Vaše naročilo je zaključeno.</p>
+          <p style="font-size:14px;line-height:1.6">Veseli bomo vaše ocene na Googlu.</p>
+          ${btn(REVIEW_URL, "Oddajte Google oceno")}`;
+        await posljiEmail(o.email, "Hvala za zaupanje – Rabimbox", ovoj("Hvala za vaše naročilo", telo));
+      } catch (err) { await releaseEmail(sb, "zakljucek", "narocilo", id, datum); throw err; }
+      return new Response(JSON.stringify({ ok: true, sent: "zakljucek" }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
     throw new Error("Neznan tip obvestila.");

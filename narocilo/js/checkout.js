@@ -86,7 +86,7 @@
     q$all("[data-back]").forEach(function(b){b.onclick=function(){s.step="choice";route();};});
     q$all(".pv-contact").forEach(function(b){b.onclick=function(){s.kontaktBack="paketi";s.kontaktZadeva="Povpraševanje – "+(izp?"izposoja":"skladiščenje")+" "+b.getAttribute("data-naziv");s.step="povprasevanje";route();};});
     q$all(".selbtn").forEach(function(b){b.onclick=function(){var id=b.getAttribute("data-id");if(s.tip==="izposoja"){s.plan=id;route();setTimeout(function(){var n=q$("#next");if(n){try{n.scrollIntoView({behavior:"smooth",block:"center"});}catch(_){}}} ,60);return;}var pl=null;SKL.forEach(function(x){if(x.id===id)pl=x;});if(pl&&pl.min){s.stBoxov=pl.min;s.plan=id;}route();setTimeout(function(){var el=q$("#stBoxov");if(el){try{el.scrollIntoView({behavior:"smooth",block:"center"});}catch(_){}try{el.focus();el.select();}catch(_){}var c=el.closest(".card");if(c){c.classList.add("rb-flash");setTimeout(function(){c.classList.remove("rb-flash");},1100);}}},70);}});
-    var bx=q$("#stBoxov");if(bx){bx.oninput=function(){var v=parseInt(bx.value,10);s.stBoxov=(isNaN(v)||v<1)?null:v;syncSklPlan();var c=q$("#cenaCalc");if(c)c.innerHTML=calcText();q$all(".plan").forEach(function(el){el.classList.toggle("sel",!!s.plan&&el.getAttribute("data-plan")===s.plan);});var n=q$("#next");if(n)n.disabled=!canNextPaketi();};}
+    var bx=q$("#stBoxov");if(bx){bx.oninput=function(){var v=parseInt(bx.value,10);s.stBoxov=(isNaN(v)||v<1)?null:v;syncSklPlan();var c=q$("#cenaCalc");if(c)c.innerHTML=calcText();q$all(".plan").forEach(function(el){var selected=!!s.plan&&el.getAttribute("data-plan")===s.plan;el.classList.toggle("sel",selected);var button=el.querySelector(".selbtn");if(button){button.textContent=selected?"Izbrano ✓":"Izberi";button.classList.toggle("ghost",!selected);}});var n=q$("#next");if(n)n.disabled=!canNextPaketi();};}
     var nb=q$("#next");if(nb)nb.onclick=function(){if(canNextPaketi()){s.step="termin";route();}};
   }
   function planForBoxes(n){if(n<=10)return "skl10";if(n<=25)return "skl25";if(n<=50)return "skl50";return "sklkontakt";}
@@ -159,11 +159,12 @@
       '<div class="field"><label>Davčna številka <span style="font-weight:400;color:var(--muted);font-size:12px">(neobvezno)</span></label><input id="davcna" value="'+esc(s.davcna)+'" placeholder="SI12345678" /></div></div>'+
       '<div class="rowflex"><div class="field"><label>Telefon</label><input id="telefon" value="'+esc(s.telefon)+'" placeholder="+386..." /></div>'+
       '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.email)+'" placeholder="ime@primer.si" /></div></div>'+
-      '</div>'+
-      '<div class="card"><h3>Dostava</h3>'+
+      '<h3>Naslov dostave</h3>'+
       '<div class="field"><label>Naslov za dostavo</label><input id="naslov" value="'+esc(s.naslov)+'" placeholder="Ulica in hišna številka" /></div>'+
       '<div class="rowflex"><div class="field" style="max-width:150px"><label>Poštna številka</label><input id="postna" value="'+esc(s.postna)+'" placeholder="1000" /></div>'+
       '<div class="field"><label>Mesto</label><input id="mesto" value="'+esc(s.mesto)+'" placeholder="Ljubljana" /></div></div>'+
+      '</div>'+
+      '<div class="card"><h3>Termin dostave</h3>'+
       '<div class="rowflex dt-row"><div class="field"><label>Datum dostave</label><input type="date" id="datum" min="'+minOrderDateStr()+'" value="'+esc(s.datum)+'" placeholder="Izberi delovni dan" /><div class="hint">Dostave pon–pet. Najzgodnejši možni termin je 3 delovne dni vnaprej.</div></div>'+
       '<div class="field"><label>Ura</label><select id="cas"><option value="">Najprej izberi datum</option></select><div class="hint" id="casHint"></div></div></div>'+
       '<div class="rowflex"><div class="field"><label>Vrsta objekta</label><select id="opis">'+objektOpts()+'</select></div>'+
@@ -426,8 +427,6 @@
       if(!sb)throw new Error("Supabase ni na voljo.");
       var r=await sb.from("narocila").insert(rec);
       if(r.error)throw r.error;
-      // Predračun po e-pošti (PDF) – potrditev naročila (če je funkcija/Resend nastavljen)
-      try{ sb.functions.invoke("poslji-racun",{body:{tip:"predracun",stevilka:ref}}); }catch(e){}
       try{ sb.functions.invoke("poslji-obvestilo",{body:{tip:"lastnik_narocilo",ref:ref}}); }catch(e){}
       // Stripe plačilo (Checkout) – preusmeritev na varno plačilno stran
       try{
@@ -443,17 +442,8 @@
         throw new Error(lastErr||"stripe");
       }catch(se){
         console.warn("Stripe checkout ni uspel (preusmeritev preskočena):", (se&&se.message)?se.message:se);
-        // Stripe (še) ni na voljo -> zaključimo brez spletnega plačila in izdamo račun
-        var total=Math.round(monthly()*100)/100;
-        var osnova=Math.round((total/1.22)*100)/100;
-        var ddv=Math.round((total-osnova)*100)/100;
-        var zap=new Date();zap.setDate(zap.getDate()+8);
-        var zapStr=zap.getFullYear()+"-"+String(zap.getMonth()+1).padStart(2,"0")+"-"+String(zap.getDate()).padStart(2,"0");
-        var racun={stevilka:ref,osnova:osnova,ddv:ddv,znesek:total,valuta:"EUR",opis:planLabel()+" - prvi mesec",status:"izdan",email:s.email,ime:s.ime||null,priimek:s.priimek||null,podjetje:s.podjetje||null,davcna:s.davcna||null,datum_izdaje:todayStr(),datum_zapadlosti:zapStr};
-        s.emailSent=false;
-        var ri=await sb.from("racuni").insert(racun);
-        if(!ri.error){s.racun={stevilka:ref,osnova:osnova,ddv:ddv,znesek:total,zapStr:zapStr};try{var fr=await sb.functions.invoke("poslji-racun",{body:{stevilka:ref}});if(fr&&!fr.error)s.emailSent=true;}catch(e){}}else{console.warn(ri.error);}
-        viewDone();
+        alert("Naročilo je shranjeno, plačilo pa trenutno ni na voljo. Predračuna ne pošiljamo. Poskusi plačilo znova v Mojem računu.");
+        window.location.href="../moj-profil/";
       }
     }catch(e){alert("Napaka pri oddaji: "+(e.message||e));btn.disabled=false;btn.textContent="Plačilo";}
   }
@@ -478,32 +468,27 @@
     var per=n<=10?4.90:n<=25?4.20:3.80;return Math.round(n*per*100)/100;
   }
   async function potrdiPlacilo(ref){
-    // Ob vrnitvi s Stripe označi naročilo kot plačano in izda račun.
-    if(!sb||!ref)return;
-    // 1) Strežniška potrditev (service-role -> obide RLS; preveri sejo pri Stripe)
+    // Status potrdi samo strežnik po preverjanju seje pri Stripe.
+    if(!sb||!ref)return false;
     var sid=new URLSearchParams(location.search).get("session_id");
     if(sid){
       var slugs=["rapid-api","stripe-checkout","Stripe-checkout"];
       for(var i=0;i<slugs.length;i++){
         try{ var cr=await sb.functions.invoke(slugs[i],{body:{confirm:true,session_id:sid}});
-          if(cr&&!cr.error&&cr.data&&cr.data.ok){ return; }
+          if(cr&&!cr.error&&cr.data&&cr.data.ok&&cr.data.paid===true){ return true; }
         }catch(e){}
       }
     }
-    // 2) Rezerva: samo poskus posodobitve naročila (račun izda strežniška potrditev/webhook).
-    //    Namenoma NE ustvarimo računa iz brskalnika, da ne pride do neskladja
-    //    (plačan račun + neplačano naročilo, če RLS blokira update naročila).
-    try{
-      await loadSession();
-      await sb.from("narocila").update({placano:true}).eq("stevilka",ref);
-    }catch(e){console.warn("potrdiPlacilo:",(e&&e.message)?e.message:e);}
+    return false;
   }
   function viewPlacanoUspeh(ref){
-    render('<div class="done-wrap"><div class="done-check">'+ICON.check+'</div>'+
-      '<h1 class="co-title">Plačilo uspešno!</h1>'+
-      '<p class="co-sub">Hvala za naročilo. Račun ti pošljemo na e-pošto.'+(ref?' Številka naročila: <b>'+esc(ref)+'</b>.':'')+' Kmalu te pokličemo za potrditev termina.</p>'+
-      '<div class="mt"><a class="btn" href="../">Nazaj na domačo stran</a> <a class="btn ghost" href="../moj-profil/">Moj račun</a></div></div>');
-    potrdiPlacilo(ref);
+    render('<div class="done-wrap"><h1 class="co-title">Preverjamo plačilo...</h1></div>');
+    potrdiPlacilo(ref).then(function(paid){
+      render('<div class="done-wrap">'+(paid?'<div class="done-check">'+ICON.check+'</div>':'')+
+        '<h1 class="co-title">'+(paid?'Plačilo uspešno!':'Plačilo še preverjamo')+'</h1>'+
+        '<p class="co-sub">'+(paid?'Naročilo je potrjeno. E-pošto z računom v priponki vam pošljemo na vaš naslov.':'Stanje plačila preveri v Mojem računu. Potrdilo z računom prejmeš po uspešni potrditvi plačila.')+(ref?' Številka naročila: <b>'+esc(ref)+'</b>.':'')+'</p>'+
+        '<div class="mt"><a class="btn" href="../">Nazaj na domačo stran</a> <a class="btn ghost" href="../moj-profil/">Moj račun</a></div></div>');
+    });
   }
   function viewPlacanoPreklic(ref){
     render('<div class="done-wrap">'+
