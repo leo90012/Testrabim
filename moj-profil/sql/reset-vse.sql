@@ -25,8 +25,8 @@ delete from public.kupci;
 delete from auth.users;
 
 -- 5) Ustvari točno 360 prostih boxov v skladišču
---    (barkoda se dodeli samodejno prek triggerja set_barkoda -> RB000001, ...)
---    Če želiš, da barkode začnejo znova pri RB000001, odkomentiraj naslednjo vrstico:
+--    (barkoda se dodeli samodejno prek triggerja set_barkoda -> RB0001, ...)
+--    Če želiš, da barkode začnejo znova pri RB0001, odkomentiraj naslednjo vrstico:
 -- alter sequence public.skatle_barkoda_seq restart with 1;
 
 insert into public.skatle (status)

@@ -1,6 +1,6 @@
 -- =====================================================================
 --  Rabimbox – pobriši vse boxe in ustvari točno 360 čistih (na_zalogi)
---  Brez test škatel: vse obstoječe pobriše, barkode začnejo pri RB000001.
+--  Brez test škatel: vse obstoječe pobriše, barkode začnejo pri RB0001.
 --  Zaženi v Supabase -> SQL Editor -> Run.
 -- =====================================================================
 
@@ -11,7 +11,7 @@ delete from public.skladisce_dogodki;      -- zgodovina skladišča (če je NE �
 -- 2) Pobriši vse boxe
 delete from public.skatle;
 
--- 3) Resetiraj številčenje barkod, da začnejo pri RB000001 (brez test ostankov)
+-- 3) Resetiraj številčenje barkod, da začnejo pri RB0001 (brez test ostankov)
 alter sequence public.skatle_barkoda_seq restart with 1;
 
 -- 4) Ustvari točno 360 prostih boxov v skladišču

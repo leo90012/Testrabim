@@ -121,13 +121,14 @@ alter table public.skatle add column if not exists narocnina_id bigint reference
 alter table public.skatle add column if not exists opomba       text;
 alter table public.skatle add column if not exists updated_at   timestamptz default now();
 
--- samodejna bar koda za prihodnje vnose (RB000001 ...), če ni vpisana
+-- samodejna bar koda za prihodnje vnose (RB0001 ... RB5000), če ni vpisana
 create sequence if not exists public.skatle_barkoda_seq;
+alter sequence public.skatle_barkoda_seq maxvalue 5000 no cycle;
 create or replace function public.set_barkoda()
 returns trigger language plpgsql as $$
 begin
   if new.barkoda is null or new.barkoda = '' then
-    new.barkoda := 'RB' || lpad(nextval('public.skatle_barkoda_seq')::text, 6, '0');
+    new.barkoda := 'RB' || lpad(nextval('public.skatle_barkoda_seq')::text, 4, '0');
   end if;
   return new;
 end;
@@ -146,13 +147,15 @@ create trigger trg_skatle_touch before update on public.skatle
   for each row execute function public.touch_updated_at();
 
 -- ------------------------------------------------------------
--- 4b) 1000 boxov na zalogi (enkratni zagon)
+-- 4b) Začetnih 360 boxov na zalogi (enkratni zagon)
 -- ------------------------------------------------------------
 insert into public.skatle (barkoda, status)
-select 'RB' || lpad(g::text, 6, '0'), 'na_zalogi'
-from generate_series(1, 1000) g
+select 'RB' || lpad(g::text, 4, '0'), 'na_zalogi'
+from generate_series(1, 360) g
 on conflict (barkoda) do nothing;
-select setval('public.skatle_barkoda_seq', 1000, true);
+select setval('public.skatle_barkoda_seq',
+  (select coalesce(max(substring(barkoda from 3)::bigint), 1)
+   from public.skatle where barkoda ~ '^RB[0-9]{4}$'), true);
 
 -- ------------------------------------------------------------
 -- 4c) Samodejno dodeljevanje boxov ob naročilu
