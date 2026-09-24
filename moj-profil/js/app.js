@@ -452,8 +452,17 @@
     let zahteve = [];
     try { const { data } = await q.narocila(); zahteve = data || []; } catch (e) {}
     state._orders = orders;
-    const narocilaCard = orders.length ? `<div class="section-title">Moja naročila</div><div class="card">${orders.map(narociloRow).join("")}</div>` : "";
-    const zahteveCard = zahteve.length ? `<div class="section-title">Zahteve za prevoz</div><div class="card">${zahteve.map(orderRow).join("")}</div>` : "";
+    const grouped = new Map(orders.map((o) => [Number(o.id), []]));
+    const legacy = [];
+    zahteve.forEach((z) => {
+      const bucket = grouped.get(Number(z.narocilo_id));
+      if (bucket) bucket.push(z); else legacy.push(z);
+    });
+    const narocilaCard = orders.length ? `<div class="section-title">Moja naročila</div>${orders.map((o) => {
+      const related = grouped.get(Number(o.id)) || [];
+      return `<div class="card" style="margin-bottom:14px">${narociloRow(o)}${related.length ? `<div style="padding:0 16px 12px 54px"><div class="s" style="font-weight:700;margin:8px 0">Zahteve za prevoz (${related.length})</div>${related.map(orderRow).join("")}</div>` : ""}</div>`;
+    }).join("")}` : "";
+    const zahteveCard = legacy.length ? `<div class="section-title">Stare zahteve brez povezave z naročilom</div><div class="card">${legacy.map(orderRow).join("")}</div>` : "";
     const prazno = (!orders.length && !zahteve.length) ? emptyState("truck", "Še nimaš oddanih naročil", "Ko oddaš naročilo, se bo skupaj s statusom plačila prikazalo tukaj.") : "";
     return `${pageHead("narocila")}<p class="page-sub">Pregled tvojih naročil ter zahtev za dostavo, prevzem in vrnitev boxov.</p>
       <button class="btn primary auto" id="newOrderBtn" style="margin-bottom:16px">Novo naročilo</button>
@@ -584,17 +593,13 @@
     try { if ((await orderBlocked(date))[parseInt(time, 10)]) { alert("Izbrani termin je že zaseden. Izberi drugega."); await loadOrderTimes(); return; } }
     catch (err) { alert("Razpoložljivosti termina trenutno ni mogoče preveriti. Poskusi znova."); return; }
     btn.disabled = true; btn.textContent = "Pošiljam...";
-    // Vrsta zahteve je prvi del opombe (skladiščni sistem bere split_part(opomba,' - ',1)).
-    const opomba = a.label + " - " + ["Naslov: " + addr, "Ura: " + time, note].filter(Boolean).join(" | ");
     try {
-      const { data: zd, error } = await state.sb.from("zahteve_dostave").insert({ kupec_id: state.kupec.id, status: "nova", brezplacna: false, datum_zahteve: new Date().toISOString(), datum_dostave: date, opomba }).select("id").single();
+      const { data: created, error } = await state.sb.rpc("rb_create_transport_requests", {
+        p_box_ids: ids, p_action: action, p_date: date, p_time: time,
+        p_address: addr, p_note: note,
+      });
       if (error) throw error;
-      if (zd && zd.id && ids.length) {
-        const rows = ids.map((bid) => ({ zahteva_id: zd.id, skatla_id: bid }));
-        const r2 = await state.sb.from("zahteve_dostave_skatle").insert(rows);
-        if (r2.error) console.warn("Povezava boxov:", r2.error.message);
-      }
-      closeSheet(); toast("Zahteva oddana"); state.tab = "narocila"; renderTab();
+      closeSheet(); toast((created || []).length === 1 ? "Zahteva oddana" : `Oddanih je ${(created || []).length} zahtev`); state.tab = "narocila"; renderTab();
     } catch (err) { alert("Napaka: " + (err.message || err)); btn.disabled = false; btn.textContent = a.submit; }
   }
 
