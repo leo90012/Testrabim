@@ -35,6 +35,11 @@ naslednji dan po datumu v Sloveniji. Velja za plačana spletna naročila,
 ročna naročila in odprte zahtevke za prevoz. Sporočilo vsebuje vrsto prevoza,
 datum, uro, naslov ter povezavo »Moj račun«.
 
+V Vault mora biti pod imenom `rabimbox_service_role` shranjen obstoječi aktivni
+secret API key projekta, ki ga uporablja tudi e-poštna funkcija. Urnik ga pošlje
+v glavi `apikey`; javni ključ iz profila ni primeren. SQL nastavitev je v
+`supabase/sql/2026-10-02-dostava-opomnik.sql`.
+
 Tabela `email_obvestila` preprečuje ponovno pošiljanje za isti termin.
 Ob neuspelem pošiljanju se zapis sprosti, da je možen ponoven poskus.
 Zaključni zahvalni e-mail uporablja povezavo za Google oceno v `REVIEW_URL`.
