@@ -139,7 +139,7 @@
   }
   const render = (h) => { APP.innerHTML = h; };
   function emptyState(iconKey, title, sub, ctaHtml) {
-    return `<div class="empty-rich"><div class="empty-ic">${ICON[iconKey] || ICON.grid}</div><h3>${esc(title)}</h3><p>${esc(sub)}</p>${ctaHtml || ""}</div>`;
+    return `<div class="empty-rich"><div class="empty-ic">${ICON[iconKey] || ICON.grid}</div><h3>${esc(title)}</h3>${sub ? `<p>${esc(sub)}</p>` : ""}${ctaHtml || ""}</div>`;
   }
   const isStorage = (b) => (b.tip_storitve || "").toLowerCase().includes("sklad");
   const cleanLoc = (l) => (l && l !== "NULL" && l !== "EMPTY") ? l : null;
@@ -345,7 +345,7 @@
     const group = (title, arr, gkey) => arr.length ? `<div class="section-title">${title} (${arr.length}) ${arr.some((b) => String(b.status || "").toLowerCase() !== "rezervirana") ? '<button class="btn outline small" id="selAllBoxes" type="button" style="margin-left:8px">Izberi vse</button>' : ""}</div><div class="card" data-group="${gkey}">${arr.map(rowH).join("")}</div>` : "";
     let boxiSection;
     if (!boxi.length) {
-      boxiSection = `<p class="page-sub">Pregled tvojih boxov in naročnine.</p>${emptyState("truck", "Še nimaš aktivnih boxov", "Naroči svoje prve boxe v 2 minutah — dostavimo jih na tvoj naslov.", '<button class="btn primary auto" id="newOrderEmpty" style="margin:16px auto 0">Naroči prve boxe</button>')}`;
+      boxiSection = `<p class="page-sub">Pregled tvojih boxov in naročnine.</p>${emptyState("truck", "Še nimaš aktivnih boxov", "", '<button class="btn primary auto" id="newOrderEmpty" style="margin:16px auto 0">Novo naročilo</button>')}`;
     } else if (state.boxView === "skl") {
       boxiSection = group("V skladišču", skl, "skl");
     } else if (state.boxView === "naj") {
@@ -485,7 +485,7 @@
       <div class="kv"><span class="k">Način naročila</span><span class="v">${paid ? '<span class="badge green">Plačano prek spleta</span>' : '<span class="badge amber">Ročni vnos</span>'}</span></div>
       ${rowKV("Storitev", o.tip)}${rowKV("Paket", o.paket)}${rowKV("Cena", o.cena_opis)}${rowKV("Termin", termin)}
       ${rowKV("Naslov", o.naslov)}${rowKV("Poštna", o.postna_stevilka)}${rowKV("Mesto", o.mesto)}${rowKV("Telefon", o.telefon)}
-      <div class="rowflex mt"><a class="btn primary" href="../narocilo/">Ponovi naročilo</a><button class="btn outline-2" type="button" data-close>Zapri</button></div>`);
+      <div class="rowflex mt"><button class="btn outline-2" type="button" data-close>Zapri</button></div>`);
   }
   function wireNarocila() {
     const b = $("#newOrderBtn"); if (b) b.addEventListener("click", () => { window.location.href = "../narocilo/"; });

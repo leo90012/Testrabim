@@ -13,12 +13,13 @@ const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const FROM = "Rabimbox <narocila@rabimbox.si>";
 const PANEL_URL = "https://test.rabimbox.si/moj-profil/";
 const WAREHOUSE_URL = "https://skladisce.rabimbox.si/";
-const REVIEW_URL = "https://www.google.com/search?q=Rabimbox+skladi%C5%A1%C4%8Denje+na+zahtevo";
+const REVIEW_URL = "https://www.google.com/search?sca_esv=a520d1af67a5285d&sxsrf=APpeQnssiZWOINEe-fy9lqIUMI2LreiXsg:1790937138393&uds=AJ5uw1_a2D0D09lxm8gpKKOTUn4rt9bo9hbAEIGGIEWIj_tTP3wXTNIZDvfluReVwSgTZ6Fn32p7X4bVEN3SDU152paiFdoRrRjyZbyutJshFLMXLFqqb1tEvOPYdWnwdlmbO3x-lB-VUt7VDkk8V7cUpz2YZKhgq9MTQ1juBaVPv62GlaOYQ5IbKkxhgX1Sbf9GAF287E1-qSHX8MOtfAFVOQF_lIJ8bw&q=Rabimbox+-+skladi%C5%A1%C4%8Denje+na+zahtevo+Mnenja&si=APenkKm7iecQ4G6P-TsbSMFKIQtv3EFIqRAFw-i8uEbk55Z-_0lonUB-e_kLLAqjlsm6QXwTUsgf2nndQZXARoWjXCt9oy19j2F6mCATnD5Pw2K6oPGuALLUSEqBELhr3hb866N-xe2hmzJwuGutpwBcBRaJuO-J3C1DIQlRWKKSpHLQraUhj-I%3D&hl=sl-SI&sa=X&ved=2ahUKEwiStsvfkJuXAxVJOfsDHTaHL7UQ_4MLegQILxAO&biw=1920&bih=945&dpr=1";
 const OWNER_EMAIL = Deno.env.get("OWNER_EMAIL") ?? "info@rabimbox.si";
 
 function isService(req: Request): boolean {
   const tok = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-  return !!SERVICE_ROLE && tok === SERVICE_ROLE;
+  const apiKey = req.headers.get("apikey") || "";
+  return !!SERVICE_ROLE && (tok === SERVICE_ROLE || apiKey === SERVICE_ROLE);
 }
 
 const cors = {
@@ -247,9 +248,12 @@ Deno.serve(async (req) => {
 
     if (tip === "dostava_opomnik_batch") {
       if (!isService(req)) throw new Error("Ni dovoljeno.");
-      const jutri = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Ljubljana", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(Date.now() + 86400000));
+      const danes = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Ljubljana", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      const jutrisnjiDatum = new Date(danes + "T00:00:00Z");
+      jutrisnjiDatum.setUTCDate(jutrisnjiDatum.getUTCDate() + 1);
+      const jutri = jutrisnjiDatum.toISOString().slice(0, 10);
       let poslano = 0;
-      const { data: orders, error: ordersError } = await sb.from("narocila").select("id,ime,email,stevilka,datum_dostave,cas_dostave,naslov,postna_stevilka,mesto,status,placano").eq("datum_dostave", jutri).eq("placano", true).in("status", ["nova", "caka_dostavo"]);
+      const { data: orders, error: ordersError } = await sb.from("narocila").select("id,ime,email,stevilka,datum_dostave,cas_dostave,naslov,postna_stevilka,mesto,status,placano,vir").eq("datum_dostave", jutri).or("placano.eq.true,vir.eq.rocno").in("status", ["nova", "caka_dostavo"]);
       if (ordersError) throw ordersError;
       const pojutrisnjem = new Date(jutri + "T00:00:00Z");
       pojutrisnjem.setUTCDate(pojutrisnjem.getUTCDate() + 1);
@@ -259,7 +263,7 @@ Deno.serve(async (req) => {
         .in("status", ["nova", "caka_dostavo"]);
       if (requestsError) throw requestsError;
       const entries: Array<{vir:string;id:number;email:string;ime:string;vrsta:string;datum:string;ura:string;naslov:string}> = [];
-      for (const o of orders || []) if (o.email) entries.push({ vir: "narocilo", id: o.id, email: o.email, ime: o.ime || "", vrsta: "dostavo", datum: jutri, ura: o.cas_dostave || "", naslov: [o.naslov, o.postna_stevilka, o.mesto].filter(Boolean).join(", ") });
+      for (const o of orders || []) if (o.email) entries.push({ vir: "narocilo", id: o.id, email: o.email, ime: o.ime || "", vrsta: "Dostava boxov", datum: jutri, ura: o.cas_dostave || "", naslov: [o.naslov, o.postna_stevilka, o.mesto].filter(Boolean).join(", ") });
       for (const z of requests || []) {
         const { data: k } = await sb.from("kupci").select("email,ime").eq("id", z.kupec_id).limit(1).maybeSingle();
         if (!k?.email) continue;
@@ -273,8 +277,8 @@ Deno.serve(async (req) => {
         if (!(await claimEmail(sb, "opomnik_dostave", e.vir, e.id, e.datum))) continue;
         try {
           const telo = `<p style="font-size:14px;line-height:1.6">Pozdravljeni${e.ime ? " " + esc(e.ime) : ""},</p>
-            <p style="font-size:14px;line-height:1.6">spominjamo vas, da je vaš ${esc(e.vrsta)} predviden jutri.</p>
-            <table style="width:100%">${vrstica("Datum", fmtDate(e.datum))}${e.ura ? vrstica("Ura", e.ura) : ""}${e.naslov ? vrstica("Naslov", e.naslov) : ""}</table>
+            <p style="font-size:14px;line-height:1.6">opominjamo vas, da imamo jutri dogovorjen termin za prevoz vaših boxov.</p>
+            <table style="width:100%">${vrstica("Storitev", e.vrsta)}${vrstica("Datum", fmtDate(e.datum))}${e.ura ? vrstica("Ura", e.ura) : ""}${e.naslov ? vrstica("Naslov", e.naslov) : ""}</table>
             <p style="font-size:13.5px;line-height:1.6">Če želite sporočiti spremembo, nas kontaktirajte na info@rabimbox.si.</p>${btn(PANEL_URL, "Moj račun")}`;
           await posljiEmail(e.email, "Opomnik za jutrišnji prevoz – Rabimbox", ovoj("Jutri smo pri vas", telo));
           poslano++;
