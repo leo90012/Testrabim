@@ -57,7 +57,7 @@
   function viewChoice(){
     render('<h1 class="co-title">Naroči zdaj</h1><p class="co-sub">Izberi storitev, ki jo potrebuješ</p>'+
       '<div class="choice-grid">'+
-      '<div class="choice" data-tip="izposoja"><div class="ic">'+ICON.truck+'</div><div class="t">Izposoja</div><div class="d">Najem trpežnih boxov za selitev</div><div class="cp">od 69 € / selitev</div></div>'+
+      '<div class="choice" data-tip="izposoja"><div class="ic">'+ICON.truck+'</div><div class="t">Izposoja</div><div class="d">Najem trpežnih boxov za selitev</div><div class="cp">od 69 € / mesečno</div></div>'+
       '<div class="choice" data-tip="skladiscenje"><div class="ic">'+ICON.box+'</div><div class="t">Skladiščenje</div><div class="d">Shranjevanje na zahtevo, dostava na dom</div><div class="cp">od 3,80 € / box na mesec</div></div>'+
       '</div>');
     q$all(".choice").forEach(function(c){c.onclick=function(){s.tip=c.getAttribute("data-tip");s.plan=null;s.stBoxov=null;s.step="paketi";route();};});
