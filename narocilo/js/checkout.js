@@ -36,6 +36,14 @@
     check:'<svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>'
   };
 
+  // Edina objavljena checkout funkcija (izvorna mapa supabase/functions/stripe-checkout).
+  var CHECKOUT_FN="rapid-api";
+  // supabase-js vrne splosno sporocilo; pravi razlog je v telesu odgovora funkcije.
+  async function fnNapaka(err){
+    try{ if(err&&err.context&&typeof err.context.json==="function"){var b=await err.context.json();if(b&&b.error)return String(b.error);} }catch(_){}
+    if(err&&err.name==="FunctionsFetchError")return "Povezava s strežnikom ni uspela. Preveri internetno povezavo in poskusi znova.";
+    return (err&&err.message)||String(err);
+  }
   function eur(n){try{return new Intl.NumberFormat("sl-SI",{style:"currency",currency:"EUR"}).format(n);}catch(e){return n+" €";}}
   function esc(x){return String(x==null?"":x).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m];});}
   function render(h){APP.innerHTML=h;try{APP.classList.remove("view-in");void APP.offsetWidth;APP.classList.add("view-in");}catch(e){}}
@@ -423,17 +431,11 @@
       podjetje:s.podjetje||null,davcna:s.davcna||null,email:s.email};
     try{
       if(!sb)throw new Error("Supabase ni na voljo.");
-      var scr=null,lastErr=null;
-      var _slugs=["rapid-api","stripe-checkout","Stripe-checkout"];
-      for(var _i=0;_i<_slugs.length;_i++){
-        try{
-          scr=await sb.functions.invoke(_slugs[_i],{body:{order:rec,pageUrl:location.origin+location.pathname}});
-          if(scr&&!scr.error&&scr.data&&scr.data.url){window.location.href=scr.data.url;return;}
-          lastErr=scr&&scr.error?(scr.error.message||"stripe"):"stripe";
-        }catch(_e){lastErr=(_e&&_e.message)?_e.message:String(_e);}
-      }
-      throw new Error(lastErr||"Plačilo trenutno ni na voljo.");
-    }catch(e){alert("Naročilo ni bilo oddano: "+(e.message||e));btn.disabled=false;btn.textContent="Plačilo";}
+      var scr=await sb.functions.invoke(CHECKOUT_FN,{body:{order:rec,pageUrl:location.origin+location.pathname}});
+      if(scr.error)throw new Error(await fnNapaka(scr.error));
+      if(scr.data&&scr.data.url){window.location.href=scr.data.url;return;}
+      throw new Error((scr.data&&scr.data.error)||"Plačilo trenutno ni na voljo.");
+    }catch(e){alert("Naročilo ni bilo oddano: "+(e.message||e));if(btn){btn.disabled=false;btn.textContent="Plačilo";}}
   }
 
   function viewDone(){
@@ -460,12 +462,10 @@
     if(!sb||!ref)return false;
     var sid=new URLSearchParams(location.search).get("session_id");
     if(sid){
-      var slugs=["rapid-api","stripe-checkout","Stripe-checkout"];
-      for(var i=0;i<slugs.length;i++){
-        try{ var cr=await sb.functions.invoke(slugs[i],{body:{confirm:true,session_id:sid}});
-          if(cr&&!cr.error&&cr.data&&cr.data.ok&&cr.data.paid===true){ return true; }
-        }catch(e){}
-      }
+      try{ var cr=await sb.functions.invoke(CHECKOUT_FN,{body:{confirm:true,session_id:sid}});
+        if(cr&&!cr.error&&cr.data&&cr.data.ok&&cr.data.paid===true){ return true; }
+        if(cr&&cr.error)console.warn("Potrditev plačila:",await fnNapaka(cr.error));
+      }catch(e){}
     }
     return false;
   }

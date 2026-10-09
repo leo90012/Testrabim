@@ -216,10 +216,12 @@
   }
   function showNotLinked() {
     const email = state.session.user.email;
-    render(`<div class="auth-wrap"><div class="auth-logo"><img src="${LOGO}" alt="Rabimbox" /><h1>Račun ni povezan</h1></div>
-      <div class="auth-card"><div class="alert info">Prijava je uspela (<b>${esc(email)}</b>), a tega e-naslova ni v naši evidenci strank.</div>
-      <p class="muted" style="font-size:14px">Verjetno je pri tebi v evidenci zapisan drug e-naslov. Piši nam in uredili bomo povezavo.</p>
-      <a class="btn primary" href="mailto:${esc(CFG.SUPPORT_EMAIL || "")}?subject=Povezava%20panela%20-%20${encodeURIComponent(email)}">Kontaktiraj podporo</a>
+    // Najpogosteje: račun je nastal ob začetku naročila, naročilo pa ni bilo plačano/oddano.
+    render(`<div class="auth-wrap"><div class="auth-logo"><img src="${LOGO}" alt="Rabimbox" /><h1>Še nimaš naročila</h1></div>
+      <div class="auth-card"><div class="alert info">Prijavljen si kot <b>${esc(email)}</b>, vendar na tem računu še ni oddanega naročila.</div>
+      <p class="muted" style="font-size:14px">Če naročila nisi dokončal (plačilo), ga oddaj znova — tvoji boxi in naročila se bodo nato prikazali tukaj.</p>
+      <a class="btn primary" href="../narocilo/">Naroči boxe</a>
+      <p class="muted" style="font-size:13px;margin:14px 0 0">Si že naročil pod drugim e-naslovom? <a href="mailto:${esc(CFG.SUPPORT_EMAIL || "")}?subject=Povezava%20panela%20-%20${encodeURIComponent(email)}">Piši nam</a> in povežemo račun.</p>
       <button class="btn ghost mt" id="logout">Odjava</button></div></div>`);
     $("#logout").addEventListener("click", doLogout);
   }
@@ -429,7 +431,7 @@
       const ref = refs[0];
       if (refs.length > 1) toast("Plačilo poteka po enem naročilu. Preusmerjam na plačilo prvega izbranega; ostala plačaj po vrnitvi.");
       payUnpaid.disabled = true; payUnpaid.textContent = "Preusmerjam...";
-      const slugs = ["rapid-api", "stripe-checkout", "Stripe-checkout"];
+      const slugs = ["rapid-api"];
       let lastErr = null;
       for (const slug of slugs) {
         try {
@@ -739,12 +741,10 @@
     // 1) Strežniška potrditev (service-role -> obide RLS; preveri sejo pri Stripe)
     const sid = qp.get("session_id");
     if (sid) {
-      for (const slug of ["rapid-api", "stripe-checkout", "Stripe-checkout"]) {
-        try {
-          const cr = await state.sb.functions.invoke(slug, { body: { confirm: true, session_id: sid } });
-          if (cr && !cr.error && cr.data && cr.data.ok && cr.data.paid === true) { toast("Plačilo je potrjeno. Račun je v potrditvenem e-sporočilu."); return; }
-        } catch (e) {}
-      }
+      try {
+        const cr = await state.sb.functions.invoke("rapid-api", { body: { confirm: true, session_id: sid } });
+        if (cr && !cr.error && cr.data && cr.data.ok && cr.data.paid === true) { toast("Plačilo je potrjeno. Račun je v potrditvenem e-sporočilu."); return; }
+      } catch (e) {}
     }
     toast("Plačilo še preverjamo. Stanje osveži čez trenutek.");
   }
