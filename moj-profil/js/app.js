@@ -222,7 +222,7 @@
     // Najpogosteje: račun je nastal ob začetku naročila, naročilo pa ni bilo plačano/oddano.
     render(`<div class="auth-wrap"><div class="auth-logo"><a class="logo-link" href="${HOME}" aria-label="Na domačo stran">${logoImg()}</a><h1>Še nimaš naročila</h1></div>
       <div class="auth-card"><div class="alert info">Prijavljen si kot <b>${esc(email)}</b>, vendar na tem računu še ni oddanega naročila.</div>
-      <p class="muted" style="font-size:14px">Če naročila nisi dokončal (plačilo), ga oddaj znova — tvoji boxi in naročila se bodo nato prikazali tukaj.</p>
+      <p class="muted" style="font-size:14px">Če naročila nisi dokončal (plačilo), ga oddaj znova. Tvoji boxi in naročila se bodo nato prikazali tukaj.</p>
       <a class="btn primary" href="../narocilo/">Naroči boxe</a>
       <p class="muted" style="font-size:13px;margin:14px 0 0">Si že naročil pod drugim e-naslovom? <a href="mailto:${esc(CFG.SUPPORT_EMAIL || "")}?subject=Povezava%20panela%20-%20${encodeURIComponent(email)}">Piši nam</a> in povežemo račun.</p>
       <button class="btn ghost mt" id="logout">Odjava</button></div></div>`);
