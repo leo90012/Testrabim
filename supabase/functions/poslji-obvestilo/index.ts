@@ -66,11 +66,11 @@ function btn(href: string, label: string): string {
   return `<div style="margin:22px 0 6px"><a href="${esc(href)}" style="display:inline-block;background:#6ec1e4;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px;font-size:14px">${esc(label)}</a></div>`;
 }
 
-async function posljiEmail(to: string, subject: string, html: string, attachments: Array<{filename:string;content:string}> = []) {
+async function posljiEmail(to: string, subject: string, html: string, attachments: Array<{filename:string;content:string}> = [], replyTo = "") {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Authorization": `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: FROM, to: [to], subject, html, ...(attachments.length ? { attachments } : {}) }),
+    body: JSON.stringify({ from: FROM, to: [to], subject, html, ...(attachments.length ? { attachments } : {}), ...(replyTo ? { reply_to: replyTo } : {}) }),
   });
   if (!res.ok) throw new Error("Resend napaka: " + (await res.text()));
   return await res.json();
@@ -221,7 +221,10 @@ Deno.serve(async (req) => {
       </table>`;
       const vpr = body.vprasanje ? `<div style="margin-top:12px;background:#f4f6f9;border-radius:8px;padding:12px 14px;font-size:14px;line-height:1.6;color:#2a3342">${esc(body.vprasanje)}</div>` : "";
       const telo = `<p style="font-size:14px;margin:0 0 4px">Novo povpraševanje s spletne strani:</p>${tabela}${vpr}`;
-      await posljiEmail(OWNER_EMAIL, "Novo povpraševanje – Rabimbox", ovoj("Novo povpraševanje", telo));
+      // "Odgovori" v e-pošti naj gre stranki, ne na naslov posiljatelja.
+      const odgovor = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(body.email || "").trim()) ? String(body.email).trim() : "";
+      const kdo = [body.ime, body.priimek].filter(Boolean).join(" ") || String(body.email || "") || "brez imena";
+      await posljiEmail(OWNER_EMAIL, `Novo povpraševanje – ${kdo}`, ovoj("Novo povpraševanje", telo), [], odgovor);
       return new Response(JSON.stringify({ ok: true, sent: "lastnik_povprasevanje" }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 

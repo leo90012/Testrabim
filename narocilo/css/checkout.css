@@ -236,3 +236,10 @@ button,.btn,a.btn,.sw,.choice,.plan,.selbtn{-webkit-tap-highlight-color:rgba(0,0
   .co-back{color:#fff;border-color:rgba(255,255,255,.35);background:transparent}
   .co-back:hover{background:rgba(255,255,255,.1);color:#fff}
 }
+
+/* ===== Samo Ljubljana + zaklenjeno povprasevanje (v20261009b) ===== */
+.alert.lj-info{background:#e8f0ff;border-color:#b9d1ff;color:#0b2a66;font-size:15px;line-height:1.5;margin:4px 0 16px}
+.alert.lj-out{background:#fff4e0;border-color:#f3c77a;color:#6b4708;font-size:15.5px;line-height:1.5;margin:20px 0 0;text-align:center}
+.pv-locked input[readonly]{background:var(--soft);color:var(--heading);border-style:dashed;cursor:default}
+.pv-locked input[readonly]:focus{box-shadow:none;border-color:var(--line)}
+.pv-note{font-size:14px}

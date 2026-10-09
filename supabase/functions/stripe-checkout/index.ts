@@ -18,11 +18,16 @@ function price(tip:string,n:number):number {
 function clean(raw:any) {
   const tip=String(raw?.tip||""), n=Number(raw?.st_boxov), amount=price(tip,n);
   if(!amount) throw new Error("Neveljavna storitev ali stevilo boxov.");
+  // Pogoji poslovanja: spletno narocilo skladiscenja najmanj 3 boxi.
+  if(tip==="skladiscenje"&&n<3) throw new Error("Najmanjše naročilo za skladiščenje so 3 boxi.");
   const email=String(raw?.email||"").trim().toLowerCase();
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Neveljaven e-naslov.");
   const datum_dostave=String(raw?.datum_dostave||""),cas_dostave=String(raw?.cas_dostave||"");
   if(!/^\d{4}-\d{2}-\d{2}$/.test(datum_dostave)||!/^\d{2}:\d{2}$/.test(cas_dostave)) throw new Error("Manjka termin.");
   if(!raw?.ime||!raw?.priimek||!raw?.naslov||!raw?.telefon) throw new Error("Manjkajo kontaktni podatki.");
+  // Spletno narocilo samo za Ljubljano (enak seznam kot v narocilnici).
+  if(!["1000","1210","1211","1231","1260","1261"].includes(String(raw?.postna_stevilka||"").trim()))
+    throw new Error("Spletno naročilo je možno samo v Ljubljani. Za druge kraje oddajte povpraševanje.");
   const order:Record<string,unknown>={tip,st_boxov:n,email,datum_dostave,cas_dostave,
     cena_opis:amount.toFixed(2).replace(".",",")+" €/mesec",
     stopnice:false,krhko:false,pomoc_polnjenje:raw?.pomoc_polnjenje===true};
