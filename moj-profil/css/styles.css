@@ -298,3 +298,18 @@ button, .btn, a.btn, .row.selectable, .nchoice, .tab { -webkit-tap-highlight-col
 /* Dinamični gumbi za dostavo/vračilo glede na stanje boxov */
 .deliver-actions { display: flex; gap: 10px; }
 .deliver-msg { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; text-align: center; color: var(--muted); font-size: 13.5px; box-shadow: var(--shadow-l); }
+
+/* ===== Logotip vodi na domaco stran + temni nacin telefona (v20261009) ===== */
+:root { color-scheme: only light; }
+.side-brand, .topbar .brand, .logo-link { text-decoration: none; }
+.side-brand:hover, .topbar .brand:hover, .logo-link:hover { text-decoration: none; }
+.logo-link { display: inline-block; }
+.side-brand picture, .topbar .brand picture, .auth-logo picture { display: block; }
+@media (prefers-color-scheme: dark) {
+  /* Temno ozadje za logotip, da je bel logotip viden (tudi ce brskalnik stran potemni) */
+  .topbar { background: #0c1830; border-bottom-color: rgba(255,255,255,.1); }
+  .topbar .who { color: rgba(255,255,255,.78); }
+  .side-brand { background: #0c1830; border-radius: 12px; padding: 10px 12px; }
+  .auth-logo .logo-link { background: #0c1830; border-radius: 14px; padding: 12px 18px; margin-bottom: 14px; }
+  .auth-logo .logo-link img { margin: 0; }
+}

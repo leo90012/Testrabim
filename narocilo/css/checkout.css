@@ -227,3 +227,12 @@ button,.btn,a.btn,.sw,.choice,.plan,.selbtn{-webkit-tap-highlight-color:rgba(0,0
 /* Večji, jasnejši "Nazaj na stran" */
 .co-back{font-size:14.5px;font-weight:600;padding:8px 12px;border-radius:9px;border:1px solid var(--line);color:var(--heading)}
 .co-back:hover{background:var(--soft);color:var(--brand)}
+
+/* ===== Temni nacin telefona (v20261009): glava temna, logotip bel ===== */
+:root{color-scheme:only light}
+.co-brand picture{display:block}
+@media (prefers-color-scheme:dark){
+  .co-header{background:#0c1830;border-bottom-color:rgba(255,255,255,.1)}
+  .co-back{color:#fff;border-color:rgba(255,255,255,.35);background:transparent}
+  .co-back:hover{background:rgba(255,255,255,.1);color:#fff}
+}

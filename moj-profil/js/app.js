@@ -4,6 +4,9 @@
   const CFG = window.RABIMBOX_CONFIG || {};
   const APP = document.getElementById("app");
   const LOGO = "Slike/5.png";
+  const HOME = "../";
+  // Barvni logotip ima temno besedilo; v temnem nacinu (tudi prisilnem) uporabimo belega.
+  const logoImg = () => `<picture><source srcset="../Slike/optimizirane/logo-bel.webp" media="(prefers-color-scheme: dark)" /><img src="${LOGO}" alt="Rabimbox" /></picture>`;
   const FOOTER = `<footer class="site-footer">
     <nav class="foot-nav">
       <a href="https://rabimbox.si/skladiscenje/" target="_blank" rel="noopener">Skladiščenje</a>
@@ -148,14 +151,14 @@
     return CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && CFG.SUPABASE_ANON_KEY !== "TUKAJ_PRILEPI_ANON_PUBLIC_KLJUC" && CFG.SUPABASE_ANON_KEY.length > 20;
   }
   function showSetup() {
-    render(`<div class="auth-wrap"><div class="auth-logo"><img src="${LOGO}" alt="Rabimbox" /><h1>Nastavitev povezave</h1></div>
+    render(`<div class="auth-wrap"><div class="auth-logo"><a class="logo-link" href="${HOME}" aria-label="Na domačo stran">${logoImg()}</a><h1>Nastavitev povezave</h1></div>
       <div class="auth-card"><div class="alert info">Vpiši svoj <b>anon (public)</b> ključ v datoteko <code>js/config.js</code>.</div>
       <ol class="muted" style="font-size:13.5px;line-height:1.7;padding-left:18px;margin:0"><li>Supabase &rarr; <b>Project Settings &rarr; API Keys &rarr; Legacy</b>.</li><li>Kopiraj vrednost <b>anon public</b>.</li><li>Prilepi jo v <code>js/config.js</code> in osveži stran.</li></ol></div></div>`);
   }
 
   function showAuth(mode = "login", msg = null, mt = "err") {
     const isReg = mode === "register", isMagic = mode === "magic";
-    render(`<div class="auth-wrap"><div class="auth-logo"><img src="${LOGO}" alt="Rabimbox" /><p>Moj račun za najem in skladiščenje</p></div>
+    render(`<div class="auth-wrap"><div class="auth-logo"><a class="logo-link" href="${HOME}" aria-label="Na domačo stran">${logoImg()}</a><p>Moj račun za najem in skladiščenje</p></div>
       <div class="auth-card">
         <div class="seg"><button data-mode="login" class="${mode === "login" ? "active" : ""}">Prijava</button><button data-mode="register" class="${isReg ? "active" : ""}">Registracija</button></div>
         ${msg ? `<div class="alert ${mt}">${msg}</div>` : ""}
@@ -217,7 +220,7 @@
   function showNotLinked() {
     const email = state.session.user.email;
     // Najpogosteje: račun je nastal ob začetku naročila, naročilo pa ni bilo plačano/oddano.
-    render(`<div class="auth-wrap"><div class="auth-logo"><img src="${LOGO}" alt="Rabimbox" /><h1>Še nimaš naročila</h1></div>
+    render(`<div class="auth-wrap"><div class="auth-logo"><a class="logo-link" href="${HOME}" aria-label="Na domačo stran">${logoImg()}</a><h1>Še nimaš naročila</h1></div>
       <div class="auth-card"><div class="alert info">Prijavljen si kot <b>${esc(email)}</b>, vendar na tem računu še ni oddanega naročila.</div>
       <p class="muted" style="font-size:14px">Če naročila nisi dokončal (plačilo), ga oddaj znova — tvoji boxi in naročila se bodo nato prikazali tukaj.</p>
       <a class="btn primary" href="../narocilo/">Naroči boxe</a>
@@ -237,13 +240,13 @@
     const k = state.kupec, ime = [k.ime, k.priimek].filter(Boolean).join(" ") || state.session.user.email;
     render(`<div class="layout">
       <aside class="sidebar">
-        <div class="side-brand"><img src="${LOGO}" alt="Rabimbox" /></div>
+        <a class="side-brand" href="${HOME}" aria-label="Na domačo stran">${logoImg()}</a>
         <div class="side-user">${esc(ime)}<span class="sub">${esc(k.email || "")}</span></div>
         <nav class="side-nav">${NAV.map((t) => `<a href="#" data-tab="${t.id}" class="${state.tab === t.id ? "active" : ""}">${esc(t.label)}</a>`).join("")}</nav>
         <div class="side-foot"><a href="../">← Nazaj na spletno stran</a><a href="#" data-logout>Odjava</a></div>
       </aside>
       <div class="main-col">
-        <header class="topbar"><div class="brand"><img src="${LOGO}" alt="Rabimbox" /></div><div class="who">${esc(ime)}</div></header>
+        <header class="topbar"><a class="brand" href="${HOME}" aria-label="Na domačo stran">${logoImg()}</a><div class="who">${esc(ime)}</div></header>
         <main class="content" id="view">${inner}</main>
       </div></div>
       <nav class="tabbar">${NAV.map((t) => `<button data-tab="${t.id}" class="${state.tab === t.id ? "active" : ""}">${ICON[t.icon]}<span>${esc(t.short)}</span></button>`).join("")}</nav>`);
@@ -508,7 +511,7 @@
       <div class="end">${reqStatusBadge(z.status)}</div></div>`;
   }
   function showSetPassword() {
-    render(`<div class="auth-wrap"><div class="auth-logo"><img src="${LOGO}" alt="Rabimbox" /><h1>Nastavi geslo</h1></div>
+    render(`<div class="auth-wrap"><div class="auth-logo"><a class="logo-link" href="${HOME}" aria-label="Na domačo stran">${logoImg()}</a><h1>Nastavi geslo</h1></div>
       <div class="auth-card"><p>Za dostop do Mojega profila nastavi geslo.</p>
         <form id="setPasswordForm"><div class="field"><label>Novo geslo</label>
         <input id="newPassword" type="password" minlength="6" autocomplete="new-password" required /></div>

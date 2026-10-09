@@ -358,3 +358,26 @@ svg[stroke-width]{stroke:currentColor}
   .hero-cta{flex-wrap:wrap}
   .hero-cta .btn{flex:1 1 100%}
 }
+
+/* ===== Temni nacin telefona (v20261009) =====
+   Brskalniku sporocimo, naj strani ne temni (Chrome to upošteva). Samsung Internet jo
+   lahko vseeno potemni, zato imajo kriticni deli lastne temne barve: temna ozadja ostanejo
+   temna tudi pri prisilnem temnjenju, beli logotip pa ostane viden. */
+:root{color-scheme:only light}
+.brand picture{display:block}
+
+/* Gumbi v heroju: bel glavni gumb in poln rob pri drugem, da sta vidna na modrem ozadju */
+.hero .hero-cta .btn-primary{background:#fff;color:var(--navy-dk);box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.hero .hero-cta .btn-primary:hover{background:#eef4ff;color:var(--navy-dk)}
+.hero .hero-cta .btn-ghost{border:1.5px solid rgba(255,255,255,.9);color:#fff}
+
+@media (prefers-color-scheme:dark){
+  .hdr{background:#0c1830}
+  .hdr.scrolled{border-color:rgba(255,255,255,.1);box-shadow:0 6px 20px rgba(0,0,0,.35)}
+  .nav a.lnk{color:#fff}
+  .burger svg{stroke:#fff}
+}
+@media (prefers-color-scheme:dark) and (max-width:880px){
+  .nav{background:#0c1830;border-bottom-color:rgba(255,255,255,.1)}
+  .nav a.lnk{border-bottom-color:rgba(255,255,255,.12)}
+}
