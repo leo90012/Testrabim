@@ -224,7 +224,9 @@ Deno.serve(async (req) => {
       // "Odgovori" v e-pošti naj gre stranki, ne na naslov posiljatelja.
       const odgovor = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(body.email || "").trim()) ? String(body.email).trim() : "";
       const kdo = [body.ime, body.priimek].filter(Boolean).join(" ") || String(body.email || "") || "brez imena";
-      await posljiEmail(OWNER_EMAIL, `Novo povpraševanje – ${kdo}`, ovoj("Novo povpraševanje", telo), [], odgovor);
+      // Gmail zdruzi sporocila z enako zadevo v eno nit; ime + cas naredita zadevo edinstveno.
+      const kdaj = new Intl.DateTimeFormat("sl-SI", { timeZone: "Europe/Ljubljana", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date());
+      await posljiEmail(OWNER_EMAIL, `Novo povpraševanje – ${kdo} (${kdaj})`, ovoj("Novo povpraševanje", telo), [], odgovor);
       return new Response(JSON.stringify({ ok: true, sent: "lastnik_povprasevanje" }), { headers: { ...cors, "Content-Type": "application/json" } });
     }
 
