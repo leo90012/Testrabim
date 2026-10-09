@@ -431,17 +431,17 @@
       const ref = refs[0];
       if (refs.length > 1) toast("Plačilo poteka po enem naročilu. Preusmerjam na plačilo prvega izbranega; ostala plačaj po vrnitvi.");
       payUnpaid.disabled = true; payUnpaid.textContent = "Preusmerjam...";
-      const slugs = ["rapid-api"];
-      let lastErr = null;
-      for (const slug of slugs) {
-        try {
-          const res = await state.sb.functions.invoke(slug, { body: { ref: ref, pageUrl: location.origin + location.pathname } });
-          if (res && !res.error && res.data && res.data.url) { window.location.href = res.data.url; return; }
-          lastErr = res && res.error ? (res.error.message || "stripe") : "stripe";
-        } catch (e) { lastErr = (e && e.message) ? e.message : String(e); }
-      }
-      console.warn("Stripe plačilo (panel) ni uspelo:", lastErr);
-      toast("Plačila trenutno ni mogoče začeti. Poskusi znova čez trenutek.");
+      let napaka = "Plačila trenutno ni mogoče začeti. Poskusi znova čez trenutek.";
+      try {
+        const res = await state.sb.functions.invoke("rapid-api", { body: { ref: ref } });
+        if (res && !res.error && res.data && res.data.url) { window.location.href = res.data.url; return; }
+        // Pravi razlog je v telesu odgovora funkcije, supabase-js vrne le splosno sporocilo.
+        if (res && res.error && res.error.context && typeof res.error.context.json === "function") {
+          const b = await res.error.context.json().catch(() => null);
+          if (b && b.error) napaka = String(b.error);
+        } else if (res && res.data && res.data.error) napaka = String(res.data.error);
+      } catch (e) { console.warn("Stripe plačilo (panel):", e); }
+      toast(napaka);
       payUnpaid.disabled = false; payUnpaid.textContent = "Plačilo izbranih (" + refs.length + ")";
     });
     updUnpaid();

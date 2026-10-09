@@ -5,6 +5,7 @@ const URL = Deno.env.get("SUPABASE_URL") || "";
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const STRIPE_KEY = Deno.env.get("STRIPE_SECRET_KEY") || "";
 const PAGE = "https://test.rabimbox.si/narocilo/";
+const PANEL = "https://test.rabimbox.si/moj-profil/";
 const cors = { "Access-Control-Allow-Origin":"*", "Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods":"POST, OPTIONS" };
 const response = (v:unknown,status=200) => new Response(JSON.stringify(v),{status,headers:{...cors,"Content-Type":"application/json"}});
 const date = (d:Date) => d.toISOString().slice(0,10);
@@ -43,7 +44,11 @@ async function legacy(sb:ReturnType<typeof createClient>,session:Stripe.Checkout
   const paid=await sb.from("narocila").update({placano:true}).eq("id",o.id);
   if(paid.error) throw paid.error;
   const total=(session.amount_total||0)/100,base=Math.round(total/1.22*100)/100;
-  const {data:inv}=await sb.from("racuni").select("id").eq("stevilka",ref).maybeSingle();
+  const {data:inv}=await sb.from("racuni").select("id,status").eq("stevilka",ref).maybeSingle();
+  if(inv&&inv.status!=="placan"){
+    const up=await sb.from("racuni").update({status:"placan"}).eq("id",inv.id);
+    if(up.error) throw up.error;
+  }
   if(!inv){
     const ir=await sb.from("racuni").insert({stevilka:ref,narocilo_id:o.id,kupec_id:o.kupec_id,
       osnova:base,ddv:Math.round((total-base)*100)/100,znesek:total,valuta:"EUR",
@@ -73,6 +78,34 @@ Deno.serve(async(req)=>{
       await notify("lastnik_narocilo",ref);
       await notify("placilo",ref);
       return response({ok:true,paid:true,ref});
+    }
+    // Placilo obstojecega neplacanega narocila (npr. rocni vnos) iz panela "Moj profil".
+    // Potrditev po placilu gre skozi obstojeco pot confirm -> legacy (metadata.ref).
+    if(body.ref&&!body.order){
+      const token=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+      const auth=token?await sb.auth.getUser(token):null;
+      const user=auth?.data?.user;
+      if(!user?.email) return response({error:"Za plačilo se prijavi v Moj profil."},401);
+      const {data:o,error}=await sb.from("narocila")
+        .select("id,stevilka,tip,st_boxov,paket,email,placano,status")
+        .eq("stevilka",String(body.ref)).maybeSingle();
+      if(error) throw error;
+      // Placa lahko samo lastnik narocila (isti e-naslov kot prijava).
+      if(!o||String(o.email||"").trim().toLowerCase()!==user.email.trim().toLowerCase())
+        throw new Error("Naročila ni mogoče najti.");
+      if(o.placano===true) throw new Error("Naročilo je že plačano.");
+      if(String(o.status||"").toLowerCase().includes("preklic")) throw new Error("Naročilo je preklicano.");
+      const amount=price(String(o.tip||""),Number(o.st_boxov));
+      if(!amount) throw new Error("Zneska za to naročilo ni mogoče izračunati. Kontaktirajte nas.");
+      const ref=String(o.stevilka);
+      const session=await stripe.checkout.sessions.create({mode:"payment",payment_method_types:["card"],
+        allow_promotion_codes:true,customer_email:String(o.email).trim().toLowerCase(),
+        line_items:[{quantity:1,price_data:{currency:"eur",unit_amount:Math.round(amount*100),
+          product_data:{name:String(o.paket||"Rabimbox")+" – prvi mesec"}}}],
+        metadata:{ref},
+        success_url:PANEL+"?placilo=uspeh&ref="+encodeURIComponent(ref)+"&session_id={CHECKOUT_SESSION_ID}",
+        cancel_url:PANEL+"?placilo=preklic&ref="+encodeURIComponent(ref)});
+      return response({url:session.url});
     }
     if(!body.order) throw new Error("Manjkajo podatki narocila.");
     const {order,amount}=clean(body.order);
