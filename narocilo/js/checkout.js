@@ -25,7 +25,7 @@
 
   // Obmocje dostave: spletno placilo samo za Ljubljano; za ostalo Slovenijo in tujino stranka odda povprasevanje.
   var OBMOCJA=[
-    ["ljubljana","Ljubljana","območje Mestne občine Ljubljana"],
+    ["ljubljana","Ljubljana",""],
     ["slovenija","Ostala Slovenija",""],
     ["tujina","Tujina",""]
   ];
@@ -212,7 +212,6 @@
       emailPolje("ime@primer.si")+'</div>'+
       '<h3>Naslov dostave</h3>'+
       obmocjeHtml()+
-      '<div class="alert lj-info">Spletno plačilo je mogoče samo za naročila po Ljubljani. Za ostalo Slovenijo in tujino oddajte povpraševanje in vas kontaktiramo.</div>'+
       '<div class="field"><label>Kraj dostave</label><input id="mesto" value="'+esc(s.mesto)+'" placeholder="Vpiši kraj" /></div>'+
       '<div class="field"><label>Naslov za dostavo</label><input id="naslov" value="'+esc(s.naslov)+'" placeholder="Ulica in hišna številka" /></div>'+
       '</div>'+

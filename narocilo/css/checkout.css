@@ -271,3 +271,10 @@ button,.btn,a.btn,.sw,.choice,.plan,.selbtn{-webkit-tap-highlight-color:rgba(0,0
   .back-inline{min-width:40px;min-height:40px;font-size:26px}
   .btn{min-height:46px}
 }
+
+/* ===== Izbira obmocja: manjse kljukice brez okvirjev (v20261014c) ===== */
+.obm-group{flex-direction:row;flex-wrap:wrap;gap:6px 22px;margin:0 0 14px}
+.obm{flex:0 0 auto;padding:6px 0;border:0;border-radius:0;background:none;box-shadow:none;font-weight:500;font-size:14.5px;gap:8px}
+.obm.on{background:none;box-shadow:none;color:var(--heading);font-weight:600}
+.obm input{width:16px;height:16px}
+@media(min-width:700px){.obm{flex:0 0 auto}}
