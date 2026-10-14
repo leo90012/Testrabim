@@ -320,3 +320,10 @@ button, .btn, a.btn, .row.selectable, .nchoice, .tab { -webkit-tap-highlight-col
 .pw-eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border: 0; background: none; color: var(--muted); cursor: pointer; display: grid; place-items: center; border-radius: 8px; box-shadow: none; }
 .pw-eye:hover { color: var(--brand); background: var(--surface-2); }
 .pw-eye svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+
+/* ===== Zasloni na dotik (tablice) (v20261014) ===== */
+@media (pointer: coarse) {
+  .btn { min-height: 46px; }
+  .btn.small { min-height: 42px; }
+  .seg-filter button, .side-nav a { min-height: 44px; }
+}

@@ -263,3 +263,11 @@ button,.btn,a.btn,.sw,.choice,.plan,.selbtn{-webkit-tap-highlight-color:rgba(0,0
 .field input.ro{background:var(--soft);color:var(--heading);cursor:default}
 .field input.ro:focus{box-shadow:none;border-color:var(--line)}
 .link-btn{background:none;border:0;padding:0;color:var(--brand);font:inherit;font-weight:600;text-decoration:underline;cursor:pointer}
+
+/* ===== Zasloni na dotik (tablice) in berljivost (v20261014) ===== */
+.plan .pu{font-size:12.5px}
+@media(pointer:coarse){
+  .btn.small{min-height:44px;padding:11px 16px;font-size:14px}
+  .back-inline{min-width:40px;min-height:40px;font-size:26px}
+  .btn{min-height:46px}
+}
