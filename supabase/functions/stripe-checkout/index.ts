@@ -25,9 +25,10 @@ function clean(raw:any) {
   const datum_dostave=String(raw?.datum_dostave||""),cas_dostave=String(raw?.cas_dostave||"");
   if(!/^\d{4}-\d{2}-\d{2}$/.test(datum_dostave)||!/^\d{2}:\d{2}$/.test(cas_dostave)) throw new Error("Manjka termin.");
   if(!raw?.ime||!raw?.priimek||!raw?.naslov||!raw?.telefon) throw new Error("Manjkajo kontaktni podatki.");
-  // Spletno narocilo samo za Ljubljano (enak seznam kot v narocilnici).
-  if(!["1000","1210","1211","1231","1260","1261"].includes(String(raw?.postna_stevilka||"").trim()))
-    throw new Error("Spletno naročilo je možno samo v Ljubljani. Za druge kraje oddajte povpraševanje.");
+  // Spletno placilo samo za obmocje Ljubljane (stranka ga izbere v narocilnici).
+  if(String(raw?.obmocje||"")!=="ljubljana")
+    throw new Error("Spletno plačilo je mogoče samo za naročila po Ljubljani. Za ostalo Slovenijo in tujino oddajte povpraševanje.");
+  if(!String(raw?.mesto||"").trim()) throw new Error("Manjka kraj dostave.");
   const order:Record<string,unknown>={tip,st_boxov:n,email,datum_dostave,cas_dostave,
     cena_opis:amount.toFixed(2).replace(".",",")+" €/mesec",
     stopnice:false,krhko:false,pomoc_polnjenje:raw?.pomoc_polnjenje===true};
@@ -114,6 +115,11 @@ Deno.serve(async(req)=>{
     }
     if(!body.order) throw new Error("Manjkajo podatki narocila.");
     const {order,amount}=clean(body.order);
+    // Prijavljena stranka lahko naroci samo z e-naslovom svoje prijave.
+    const narToken=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+    const narUser=narToken?(await sb.auth.getUser(narToken).catch(()=>null))?.data?.user:null;
+    if(narUser?.email&&narUser.email.trim().toLowerCase()!==String(order.email))
+      throw new Error("Naročilo lahko oddaš samo z e-naslovom, s katerim si prijavljen ("+narUser.email+").");
     const occupied=await sb.rpc("zasedeni_termini",{d:order.datum_dostave});
     if(occupied.error) throw occupied.error;
     if((occupied.data||[]).some((s:unknown)=>String(s).slice(0,2)===String(order.cas_dostave).slice(0,2)))

@@ -23,16 +23,12 @@
   var s={step:"choice",tip:null,plan:null,stBoxov:null,extras:{stopnice:false,krhko:false,pomoc:false,dvigalo:false},
     opis:"",nadstropje:"",naslov:"",enota:"",postna:"",mesto:"",telefon:"",datum:"",cas:"",ime:"",priimek:"",email:"",geslo:"",racunMode:"novo",soglasje:false,loggedIn:false,loginHint:false,kontaktBack:null,kontaktZadeva:"",podjetje:"",davcna:""};
 
-  // Spletno narocilo je mozno samo za te poste (Ljubljana). Za druge kraje stranka odda povprasevanje.
-  var LJ_POSTE_SEZNAM=[
-    ["1000","Ljubljana",""],
-    ["1210","Ljubljana - Šentvid",""],
-    ["1211","Ljubljana - Šmartno","tudi Spodnje, Srednje in Zgornje Gameljne"],
-    ["1231","Ljubljana - Črnuče",""],
-    ["1260","Ljubljana - Polje",""],
-    ["1261","Ljubljana - Dobrunje",""]
+  // Obmocje dostave: spletno placilo samo za Ljubljano; za ostalo Slovenijo in tujino stranka odda povprasevanje.
+  var OBMOCJA=[
+    ["ljubljana","Ljubljana","območje Mestne občine Ljubljana"],
+    ["slovenija","Ostala Slovenija",""],
+    ["tujina","Tujina",""]
   ];
-  var LJ_POSTE=LJ_POSTE_SEZNAM.map(function(p){return p[0];});
 
   (function(){var qp=new URLSearchParams(location.search);var t=qp.get("tip");if(t==="izposoja"||t==="skladiscenje"){s.tip=t;s.plan=null;s.stBoxov=null;s.step="paketi";}})();
 
@@ -53,6 +49,37 @@
     if(err&&err.name==="FunctionsFetchError")return "Povezava s strežnikom ni uspela. Preveri internetno povezavo in poskusi znova.";
     return (err&&err.message)||String(err);
   }
+  // Prikaz gesla: vsakemu polju za geslo (tudi kasneje narisanemu) dodamo gumb z ocesom.
+  (function(){
+    var OKO='<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var OKO_ZAPRTO='<svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a10.6 10.6 0 0 0 5.4-1.5"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+    function opremi(inp){
+      if(inp.dataset.pwEye)return; inp.dataset.pwEye="1";
+      var w=document.createElement("span"); w.className="pw-wrap";
+      inp.parentNode.insertBefore(w,inp); w.appendChild(inp);
+      var b=document.createElement("button"); b.type="button"; b.className="pw-eye";
+      b.setAttribute("aria-label","Pokaži geslo"); b.setAttribute("aria-pressed","false"); b.innerHTML=OKO;
+      b.onclick=function(){var vidno=inp.type==="password"; inp.type=vidno?"text":"password";
+        b.innerHTML=vidno?OKO_ZAPRTO:OKO; b.setAttribute("aria-label",vidno?"Skrij geslo":"Pokaži geslo"); b.setAttribute("aria-pressed",vidno?"true":"false");};
+      w.appendChild(b);
+    }
+    function preglej(){document.querySelectorAll('input[type="password"]:not([data-pw-eye])').forEach(opremi);}
+    if(window.MutationObserver){new MutationObserver(preglej).observe(document.documentElement,{childList:true,subtree:true});}
+    document.addEventListener("DOMContentLoaded",preglej); preglej();
+  })();
+  // Prijavljena stranka lahko naroci samo z e-naslovom, s katerim je prijavljena.
+  function emailPolje(placeholder){
+    if(s.loggedIn&&s.sessionEmail){
+      return '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.sessionEmail)+'" readonly tabindex="-1" class="ro" />'+
+        '<div class="hint">Prijavljen(a) si kot <b>'+esc(s.sessionEmail)+'</b>. Naročilo bo oddano na ta e-naslov. Za drug e-naslov se <button type="button" class="link-btn" id="odjava">odjavi</button>.</div></div>';
+    }
+    return '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.email)+'"'+(placeholder?' placeholder="'+placeholder+'"':'')+' /></div>';
+  }
+  document.addEventListener("click",async function(e){
+    if(!e.target||e.target.id!=="odjava")return;
+    try{ if(sb) await sb.auth.signOut(); }catch(_){}
+    s.loggedIn=false;s.sessionEmail="";s.email="";route();
+  });
   function eur(n){try{return new Intl.NumberFormat("sl-SI",{style:"currency",currency:"EUR"}).format(n);}catch(e){return n+" €";}}
   function esc(x){return String(x==null?"":x).replace(/[&<>"']/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m];});}
   function render(h){APP.innerHTML=h;try{APP.classList.remove("view-in");void APP.offsetWidth;APP.classList.add("view-in");}catch(e){}}
@@ -139,16 +166,17 @@
   }
 
   // ---- TERMIN ----
-  function ljAllowed(){return LJ_POSTE.indexOf((s.postna||"").trim())>=0;}
-  function postaOpts(){
-    var cur=(s.postna||"").trim();
-    return '<option value="">Izberi poštno številko…</option>'+
-      LJ_POSTE_SEZNAM.map(function(p){return '<option value="'+p[0]+'"'+(cur===p[0]?" selected":"")+'>'+p[0]+' '+esc(p[1])+(p[2]?' ('+esc(p[2])+')':'')+'</option>';}).join("")+
-      '<option value="drugo"'+(s.izvenLJ?" selected":"")+'>Drug kraj (samo povpraševanje)</option>';
+  function ljAllowed(){return s.obmocje==="ljubljana";}
+  function obmocjeHtml(){
+    return '<div class="obm-group" role="group" aria-label="Območje dostave">'+OBMOCJA.map(function(o){
+      var on=s.obmocje===o[0];
+      return '<label class="obm'+(on?' on':'')+'"><input type="checkbox" class="obm-cb" value="'+o[0]+'"'+(on?' checked':'')+' />'+
+        '<span class="obm-t">'+esc(o[1])+(o[2]?' <small>('+esc(o[2])+')</small>':'')+'</span></label>';
+    }).join("")+'</div>';
   }
   function terminNavHtml(){
-    var izven=!!s.izvenLJ;
-    return (izven?'<div class="alert lj-out">Spletno naročilo je možno <b>samo v Ljubljani</b>. Za vaš kraj nam oddajte povpraševanje – pripravili vam bomo ponudbo.</div>':'')+
+    var izven=!!s.obmocje&&s.obmocje!=="ljubljana";
+    return (izven?'<div class="alert lj-out">Spletno plačilo je mogoče samo za naročila po Ljubljani. Za ostalo Slovenijo in tujino oddajte povpraševanje in vas kontaktiramo.</div>':'')+
       '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button>'+
       (izven?'<button type="button" class="btn" id="terminContact">Oddaj povpraševanje</button>'
             :'<button class="btn" id="next">Naprej</button>')+
@@ -156,11 +184,11 @@
   }
   function bindTerminNav(){
     q$all("[data-back]").forEach(function(b){b.onclick=function(){s.step="paketi";route();};});
-    var tc=q$("#terminContact");if(tc)tc.onclick=function(){s.kontaktBack="termin";s.kontaktZadeva="Povpraševanje – dostava izven Ljubljane"+(s.naslov?(". Naslov: "+s.naslov):". Kraj: ");s.step="povprasevanje";route();};
+    var tc=q$("#terminContact");if(tc)tc.onclick=function(){s.kontaktBack="termin";s.kontaktZadeva="Povpraševanje – dostava "+(s.obmocje==="tujina"?"v tujino":"izven Ljubljane")+(s.mesto?(". Kraj: "+s.mesto):"")+(s.naslov?(". Naslov: "+s.naslov):"");s.step="povprasevanje";route();};
     var nb=q$("#next");
     if(nb)nb.onclick=function(){
-      if(!ljAllowed()){alert("Izberi poštno številko. Spletno naročilo je možno samo v Ljubljani.");var pe=q$("#posta");if(pe)pe.focus();return;}
-      if(!s.ime||!s.priimek||!s.naslov||!s.telefon){alert("Prosim izpolni ime, priimek, naslov in telefon.");return;}
+      if(!ljAllowed()){alert("Izberi območje dostave. Spletno plačilo je mogoče samo za naročila po Ljubljani.");return;}
+      if(!s.ime||!s.priimek||!s.naslov||!s.mesto||!s.telefon){alert("Prosim izpolni ime, priimek, telefon, kraj in naslov dostave.");return;}
       if(!s.email||s.email.indexOf("@")<1){alert("Prosim vpiši veljaven e-naslov.");return;}
       if(!s.datum||!s.cas){alert("Prosim izberi datum in uro.");return;}
       if(s.datum<minOrderDateStr()){alert("Najzgodnejši možni termin je 3 delovne dni od danes. Prosim izberi kasnejši datum.");return;}
@@ -181,10 +209,11 @@
       '<div class="rowflex"><div class="field"><label>Naziv podjetja <span style="font-weight:400;color:var(--muted);font-size:12px">(neobvezno)</span></label><input id="podjetje" value="'+esc(s.podjetje)+'" placeholder="Za račun na podjetje" /></div>'+
       '<div class="field"><label>Davčna številka <span style="font-weight:400;color:var(--muted);font-size:12px">(neobvezno)</span></label><input id="davcna" value="'+esc(s.davcna)+'" placeholder="SI12345678" /></div></div>'+
       '<div class="rowflex"><div class="field"><label>Telefon</label><input id="telefon" value="'+esc(s.telefon)+'" placeholder="+386..." /></div>'+
-      '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.email)+'" placeholder="ime@primer.si" /></div></div>'+
+      emailPolje("ime@primer.si")+'</div>'+
       '<h3>Naslov dostave</h3>'+
-      '<div class="alert lj-info"><b>Dostavljamo samo v Ljubljani</b> – poštne številke '+LJ_POSTE.join(", ")+'. Za druge kraje izberite »Drug kraj« in oddajte povpraševanje.</div>'+
-      '<div class="field"><label>Poštna številka in kraj</label><select id="posta">'+postaOpts()+'</select></div>'+
+      obmocjeHtml()+
+      '<div class="alert lj-info">Spletno plačilo je mogoče samo za naročila po Ljubljani. Za ostalo Slovenijo in tujino oddajte povpraševanje in vas kontaktiramo.</div>'+
+      '<div class="field"><label>Kraj dostave</label><input id="mesto" value="'+esc(s.mesto)+'" placeholder="Vpiši kraj" /></div>'+
       '<div class="field"><label>Naslov za dostavo</label><input id="naslov" value="'+esc(s.naslov)+'" placeholder="Ulica in hišna številka" /></div>'+
       '</div>'+
       '<div class="card"><h3>Termin dostave</h3>'+
@@ -196,13 +225,13 @@
       '</div>'+
       '</div>'+summaryCard()+'</div>'+
       '<div id="terminNav">'+terminNavHtml()+'</div>');
-    ["ime","priimek","podjetje","davcna","naslov","telefon","email"].forEach(function(id){var e=q$("#"+id);if(e)e.oninput=function(ev){s[id]=ev.target.value;};});
-    var pe=q$("#posta");if(pe)pe.onchange=function(){
-      var v=pe.value;s.izvenLJ=(v==="drugo");
-      var p=null;LJ_POSTE_SEZNAM.forEach(function(x){if(x[0]===v)p=x;});
-      s.postna=p?p[0]:"";s.mesto=p?p[1]:"";
+    ["ime","priimek","podjetje","davcna","naslov","mesto","telefon","email"].forEach(function(id){var e=q$("#"+id);if(e)e.oninput=function(ev){s[id]=ev.target.value;};});
+    // Kljukice delujejo kot enojna izbira: ob izbiri ene se ostali odznacita.
+    q$all(".obm-cb").forEach(function(cb){cb.onchange=function(){
+      s.obmocje=cb.checked?cb.value:"";
+      q$all(".obm-cb").forEach(function(o){o.checked=(o.value===s.obmocje);o.closest(".obm").classList.toggle("on",o.checked);});
       refreshTerminNav();
-    };
+    };});
     q$all(".sw").forEach(function(sw){sw.onclick=function(){var k=sw.getAttribute("data-k");s.extras[k]=!s.extras[k];sw.classList.toggle("on",s.extras[k]);};});
     var op=q$("#opis");if(op)op.onchange=function(e){s.opis=e.target.value;};
     var nd=q$("#nadstropje");if(nd)nd.oninput=function(e){s.nadstropje=e.target.value;};
@@ -307,7 +336,7 @@
   }
   function amErr(h){var e=gid("am_err");if(e)e.innerHTML=h?'<div class="alert err">'+esc(h)+'</div>':"";}
   async function afterAuth(email,ime,priimek){
-    s.loggedIn=true;s.loginHint=false;if(email)s.email=email;if(ime&&!s.ime)s.ime=ime;if(priimek&&!s.priimek)s.priimek=priimek;
+    s.loggedIn=true;s.loginHint=false;if(email){s.email=email;s.sessionEmail=email;}if(ime&&!s.ime)s.ime=ime;if(priimek&&!s.priimek)s.priimek=priimek;
     try{await loadKupci(email);}catch(e){}
     closeAuthModal();route();
   }
@@ -402,12 +431,12 @@
       '<div class="split"><div class="card">'+
       '<div class="rowflex"><div class="field"><label>Ime</label><input id="ime" value="'+esc(s.ime)+'" /></div>'+
       '<div class="field"><label>Priimek</label><input id="priimek" value="'+esc(s.priimek)+'" /></div></div>'+
-      '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.email)+'" /></div>'+
+      emailPolje("")+
       '<div class="alert info">Po oddaji te preusmerimo na varno plačilo prvega meseca (Stripe).</div>'+
       '</div>'+summaryCard()+'</div>'+
       '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button><button class="btn" id="submit">Plačilo</button></div>');
     q$all("[data-back]").forEach(function(b){b.onclick=function(){s.step="povzetek";route();};});
-    ["ime","priimek","email"].forEach(function(id){q$("#"+id).oninput=function(e){s[id]=e.target.value;};});
+    ["ime","priimek","email"].forEach(function(id){var e=q$("#"+id);if(e&&!e.readOnly)e.oninput=function(ev){s[id]=ev.target.value;};});
     q$("#submit").onclick=submit;
   }
 
@@ -437,11 +466,12 @@
 
   async function submit(){
     var _hp=q$("#hp_order"); if(_hp&&_hp.value){return;}
-    if(!s.email||s.email.indexOf("@")<0||!s.ime||!s.priimek||!s.naslov||!s.postna||!s.mesto||!s.telefon||!s.datum||!s.cas){alert("Prosim izpolni vse podatke in termin (korak Termin).");s.step="termin";route();return;}
+    if(!s.email||s.email.indexOf("@")<0||!s.ime||!s.priimek||!s.naslov||!ljAllowed()||!s.mesto||!s.telefon||!s.datum||!s.cas){alert("Prosim izpolni vse podatke in termin (korak Termin).");s.step="termin";route();return;}
     if(!s.loggedIn){
       if(!s.geslo||s.geslo.length<6){alert("Vpiši geslo (vsaj 6 znakov) za svoj račun.");s.step="racun";route();return;}
       if(!s.soglasje){alert("Za ustvarjanje računa moraš soglašati s pogoji poslovanja.");s.step="racun";route();return;}
     }
+    if(s.loggedIn&&s.sessionEmail)s.email=s.sessionEmail;
     var btn=q$("#pay")||q$("#submit");if(btn){btn.disabled=true;btn.textContent="Pošiljam...";}
     if(s.datum&&s.cas){var _bl=await blockedFor(s.datum);if(_bl[parseInt(s.cas,10)]){alert("Izbrani termin je pravkar zaseden. Prosim izberi drug termin.");if(btn){btn.disabled=false;btn.textContent="Plačilo";}s.step="termin";route();return;}}
     if(sb&&!s.loggedIn){
@@ -455,7 +485,7 @@
       cena_opis:cenaOpis(),stopnice:false,krhko:false,pomoc_polnjenje:s.extras.pomoc,
       opis_lokacije:("Vrsta objekta: "+(s.opis||"-")+" | Nadstropje: "+(s.nadstropje||"-")+" | Dvigalo: "+(s.extras.dvigalo?"Da":"Ne")),naslov:s.naslov||null,enota:null,postna_stevilka:s.postna||null,mesto:s.mesto||null,telefon:s.telefon||null,
       datum_dostave:s.datum||null,cas_dostave:s.cas||null,ime:s.ime||null,priimek:s.priimek||null,
-      podjetje:s.podjetje||null,davcna:s.davcna||null,email:s.email};
+      podjetje:s.podjetje||null,davcna:s.davcna||null,email:s.email,obmocje:s.obmocje||null};
     try{
       if(!sb)throw new Error("Supabase ni na voljo.");
       var scr=await sb.functions.invoke(CHECKOUT_FN,{body:{order:rec,pageUrl:location.origin+location.pathname}});
@@ -549,9 +579,6 @@
         if(!s.naslov)s.naslov=kr.data.naslov||"";
         if(!s.postna)s.postna=kr.data.postna_stevilka||"";
         if(!s.mesto)s.mesto=kr.data.kraj||"";
-        // Shranjen naslov uporabimo samo, ce je posta na seznamu; sicer naj stranka izbere znova.
-        var pz=null;LJ_POSTE_SEZNAM.forEach(function(x){if(x[0]===String(s.postna).trim())pz=x;});
-        if(pz){s.postna=pz[0];s.mesto=pz[1];}else{s.postna="";s.mesto="";}
       }
     }).catch(function(){});
   }
@@ -562,9 +589,9 @@
       var session=(r&&r.data)?r.data.session:null;
       if(session&&session.user){
         s.loggedIn=true;s.loginHint=false;
-        if(!s.email)s.email=session.user.email||"";
+        s.sessionEmail=session.user.email||"";s.email=s.sessionEmail;
         await loadKupci(session.user.email);
-      }else{s.loggedIn=false;}
+      }else{s.loggedIn=false;s.sessionEmail="";}
     }catch(e){}
   }
   function subscribeAuth(){
@@ -572,9 +599,9 @@
     sb.auth.onAuthStateChange(function(event,session){
       if(session&&session.user){
         s.loggedIn=true;s.loginHint=false;
-        if(!s.email)s.email=session.user.email||"";
-        loadKupci(session.user.email).then(function(){if(s.step==="racun")route();});
-      }else{s.loggedIn=false;}
+        s.sessionEmail=session.user.email||"";s.email=s.sessionEmail;
+        loadKupci(session.user.email).then(function(){if(s.step==="racun"||s.step==="termin")route();});
+      }else{s.loggedIn=false;s.sessionEmail="";}
     });
   }
   var _qp=new URLSearchParams(location.search);var _pl=_qp.get("placilo");

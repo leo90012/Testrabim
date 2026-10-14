@@ -243,3 +243,23 @@ button,.btn,a.btn,.sw,.choice,.plan,.selbtn{-webkit-tap-highlight-color:rgba(0,0
 .pv-locked input[readonly]{background:var(--soft);color:var(--heading);border-style:dashed;cursor:default}
 .pv-locked input[readonly]:focus{box-shadow:none;border-color:var(--line)}
 .pv-note{font-size:14px}
+
+/* ===== Izbira obmocja dostave (v20261014) ===== */
+.obm-group{display:flex;flex-direction:column;gap:8px;margin:2px 0 14px}
+.obm{display:flex;align-items:center;gap:11px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;font-weight:600;color:var(--heading);font-size:15px;transition:border-color .15s,background .15s}
+.obm small{font-weight:400;color:var(--muted);font-size:13px}
+.obm input{width:20px;height:20px;margin:0;flex:0 0 auto;accent-color:var(--brand);cursor:pointer}
+.obm.on{border-color:var(--brand);background:#f4f8ff;box-shadow:0 0 0 3px rgba(0,103,255,.10)}
+@media(min-width:700px){.obm-group{flex-direction:row}.obm{flex:1}}
+
+/* Prikaz gesla */
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:46px!important}
+.pw-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:none;color:var(--muted);cursor:pointer;display:grid;place-items:center;border-radius:8px}
+.pw-eye:hover{color:var(--brand);background:var(--soft)}
+.pw-eye svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* E-posta prijavljene stranke je zaklenjena */
+.field input.ro{background:var(--soft);color:var(--heading);cursor:default}
+.field input.ro:focus{box-shadow:none;border-color:var(--line)}
+.link-btn{background:none;border:0;padding:0;color:var(--brand);font:inherit;font-weight:600;text-decoration:underline;cursor:pointer}

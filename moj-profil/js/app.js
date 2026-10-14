@@ -21,6 +21,24 @@
   const state = { sb: null, session: null, kupec: null, tab: "nadzor", hasRacuni: null, boxView: null, narocnine: null,
     needsPassword: /(?:^|[&#?])type=(invite|recovery)(?:&|$)/.test(location.hash + location.search) };
 
+  // Prikaz gesla: vsakemu polju za geslo (tudi kasneje narisanemu) dodamo gumb z ocesom.
+  (function(){
+    var OKO='<svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+    var OKO_ZAPRTO='<svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.9 10.9 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a10.6 10.6 0 0 0 5.4-1.5"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+    function opremi(inp){
+      if(inp.dataset.pwEye)return; inp.dataset.pwEye="1";
+      var w=document.createElement("span"); w.className="pw-wrap";
+      inp.parentNode.insertBefore(w,inp); w.appendChild(inp);
+      var b=document.createElement("button"); b.type="button"; b.className="pw-eye";
+      b.setAttribute("aria-label","Pokaži geslo"); b.setAttribute("aria-pressed","false"); b.innerHTML=OKO;
+      b.onclick=function(){var vidno=inp.type==="password"; inp.type=vidno?"text":"password";
+        b.innerHTML=vidno?OKO_ZAPRTO:OKO; b.setAttribute("aria-label",vidno?"Skrij geslo":"Pokaži geslo"); b.setAttribute("aria-pressed",vidno?"true":"false");};
+      w.appendChild(b);
+    }
+    function preglej(){document.querySelectorAll('input[type="password"]:not([data-pw-eye])').forEach(opremi);}
+    if(window.MutationObserver){new MutationObserver(preglej).observe(document.documentElement,{childList:true,subtree:true});}
+    document.addEventListener("DOMContentLoaded",preglej); preglej();
+  })();
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
