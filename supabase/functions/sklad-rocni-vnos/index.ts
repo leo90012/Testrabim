@@ -45,10 +45,9 @@ Deno.serve(async(req)=>{
       if(stock.error) throw stock.error;
       if((stock.count||0)<n) throw new Error("Trenutno ni dovolj prostih boxov.");
     }
-    // Povabilo odpre racun za prijavo v Moj profil. Obstojeci uporabnik ga ne potrebuje.
-    const invite=await sb.auth.admin.inviteUserByEmail(email,{redirectTo:"https://test.rabimbox.si/moj-profil/"});
-    if(invite.error&&!/already|registered|exists/i.test(invite.error.message))
-      throw new Error("Povabila za profil ni bilo mogoce poslati: "+invite.error.message);
+    // Povezavo za nastavitev gesla ustvarimo sami (Supabase je ne poslje), nato jo
+    // posljemo v nasem slovenskem sporocilu. Panel jo potrdi sele ob odprtju strani.
+    const dostop=await pripraviDostop(sb,email);
     let customer=await sb.from("kupci").select("id").ilike("email",email).maybeSingle();
     if(customer.error) throw customer.error;
     if(!customer.data){
@@ -56,7 +55,10 @@ Deno.serve(async(req)=>{
         postna_stevilka:posta,kraj:mesto,status_narocnine:"neaktivna"}).select("id").single();
       if(customer.error) throw customer.error;
     }
-    if(onlyProfile) return json({ok:true,kupec_id:customer.data.id,povabilo:!invite.error});
+    if(onlyProfile){
+      const poslano=await posljiDostop(email,ime,dostop,null);
+      return json({ok:true,kupec_id:customer.data.id,povabilo:poslano.ok,email_napaka:poslano.napaka});
+    }
     const amount=tip==="skladiscenje"
       ?Math.round(n*(n<=10?4.90:n<=25?4.20:3.80)*100)/100
       :({20:69,40:109,60:149,80:189} as Record<number,number>)[n];
@@ -70,7 +72,75 @@ Deno.serve(async(req)=>{
       stevilka:ref,vir:"rocno",placano:false,status:"nova",kupec_id:customer.data.id,
     }).select("id,stevilka").single();
     if(order.error) throw order.error;
+    const poslano=await posljiDostop(email,ime,dostop,{stevilka:order.data.stevilka,tip,n,date,time,amount});
     return json({ok:true,narocilo_id:order.data.id,stevilka:order.data.stevilka,
-      povabilo:!invite.error});
+      povabilo:poslano.ok,email_napaka:poslano.napaka});
   }catch(e){console.error("Rocni vnos:",e);return json({error:String((e as Error).message||e)},400);}
 });
+
+// ---------- Dostop do Mojega profila in e-posta stranki ----------
+const PANEL="https://test.rabimbox.si/moj-profil/";
+const RESEND_API_KEY=Deno.env.get("RESEND_API_KEY")||"";
+const FROM="Rabimbox <narocila@rabimbox.si>";
+type Dostop={link:string;novo:boolean};
+
+// Nov uporabnik: povezava "invite". Obstojeci, ki se se ni prijavil: "recovery" (nastavi geslo).
+// Obstojeci, ki ze ima geslo: navadna povezava na prijavo.
+async function pripraviDostop(sb:ReturnType<typeof createClient>,email:string):Promise<Dostop>{
+  const inv=await sb.auth.admin.generateLink({type:"invite",email,options:{redirectTo:PANEL}});
+  if(!inv.error&&inv.data?.properties?.hashed_token)
+    return {link:PANEL+"?token_hash="+encodeURIComponent(inv.data.properties.hashed_token)+"&type=invite",novo:true};
+  if(inv.error&&!/already|registered|exists/i.test(inv.error.message))
+    throw new Error("Povezave za profil ni bilo mogoce ustvariti: "+inv.error.message);
+  const rec=await sb.auth.admin.generateLink({type:"recovery",email,options:{redirectTo:PANEL}});
+  if(rec.error||!rec.data?.properties?.hashed_token) return {link:PANEL,novo:false};
+  if(rec.data.user?.last_sign_in_at) return {link:PANEL,novo:false};
+  return {link:PANEL+"?token_hash="+encodeURIComponent(rec.data.properties.hashed_token)+"&type=recovery",novo:true};
+}
+
+function esc(x:unknown){return String(x??"").replace(/[&<>"']/g,(m)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m] as string));}
+function datum(d:string){const p=d.split("-");return p.length===3?`${+p[2]}. ${+p[1]}. ${p[0]}`:d;}
+
+async function posljiDostop(email:string,ime:string,d:Dostop,
+  nar:{stevilka:string;tip:string;n:number;date:string;time:string;amount:number}|null){
+  if(!RESEND_API_KEY) return {ok:false,napaka:"RESEND_API_KEY ni nastavljen."};
+  const vrstica=(k:string,v:string)=>`<tr><td style="padding:6px 0;color:#7b8794;font-size:13px">${esc(k)}</td><td style="padding:6px 0;text-align:right;color:#2a3342;font-size:14px;font-weight:600">${esc(v)}</td></tr>`;
+  const tabela=nar?`<table style="width:100%;border-collapse:collapse;margin:14px 0 4px">
+      ${vrstica("Številka naročila",nar.stevilka)}
+      ${vrstica("Storitev",(nar.tip==="izposoja"?"Izposoja":"Skladiščenje")+" – "+nar.n+" boxov")}
+      ${vrstica("Termin dostave",datum(nar.date)+" ob "+nar.time)}
+      ${vrstica("Cena",nar.amount.toFixed(2).replace(".",",")+" € / mesec")}
+    </table>`:"";
+  const uvod=nar
+    ?`Za vas smo pripravili naročilo pri Rabimbox. Podrobnosti so spodaj, naročilo pa lahko kadarkoli spremljate v svojem profilu.`
+    :`Za vas smo pri Rabimbox odprli uporabniški profil, kjer lahko spremljate svoja naročila, bokse in račune.`;
+  const korak=d.novo
+    ?`<p style="font-size:14px;line-height:1.6;margin:14px 0 0">Za vstop v profil si najprej nastavite geslo s klikom na spodnji gumb.</p>`
+    :`<p style="font-size:14px;line-height:1.6;margin:14px 0 0">V profil se prijavite s svojim e-naslovom in geslom.</p>`;
+  const gumb=d.novo?"Nastavi geslo in odpri profil":"Prijava v Moj profil";
+  const html=`<div style="background:#f4f6f9;padding:24px 0;font-family:Arial,Helvetica,sans-serif;color:#2a3342">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 6px 22px rgba(16,24,40,.06)">
+      <div style="background:#6ec1e4;padding:16px 26px;color:#fff;font-size:20px;font-weight:700;letter-spacing:.5px"><img src="https://rabimbox.si/wp-content/uploads/2024/08/cropped-3-270x270.png" alt="" width="34" height="34" style="vertical-align:middle;margin-right:10px;border-radius:6px" />Rabimbox</div>
+      <div style="padding:26px">
+        <h1 style="font-size:20px;margin:0 0 14px;color:#111">${nar?"Vaše naročilo je pripravljeno":"Vaš profil je pripravljen"}</h1>
+        <p style="font-size:14px;line-height:1.6;margin:0">Pozdravljeni${ime?", "+esc(ime):""}!</p>
+        <p style="font-size:14px;line-height:1.6;margin:8px 0 0">${uvod}</p>
+        ${tabela}${korak}
+        <div style="margin:22px 0 6px"><a href="${esc(d.link)}" style="display:inline-block;background:#0067ff;color:#fff;text-decoration:none;font-weight:700;padding:13px 24px;border-radius:8px;font-size:15px">${gumb}</a></div>
+        <p style="font-size:12.5px;color:#7b8794;line-height:1.6;margin:14px 0 0">Če gumb ne deluje, kopirajte to povezavo v brskalnik:<br><a href="${esc(d.link)}" style="color:#0067ff;word-break:break-all">${esc(d.link)}</a></p>
+        ${d.novo?`<p style="font-size:12.5px;color:#7b8794;line-height:1.6;margin:10px 0 0">Povezava je namenjena samo vam in jo lahko uporabite enkrat. Če je potekla, na strani za prijavo kliknite »Pozabljeno geslo«.</p>`:""}
+      </div>
+      <div style="padding:16px 26px;border-top:1px solid #eef1f6;color:#7b8794;font-size:12px">
+        Rabimbox · <a href="mailto:info@rabimbox.si" style="color:#6ec1e4;text-decoration:none">info@rabimbox.si</a> · +386 (0)40 796 040
+      </div>
+    </div>
+  </div>`;
+  const zadeva=nar?`Vaše naročilo ${nar.stevilka} – Rabimbox`:"Vaš profil pri Rabimbox";
+  try{
+    const r=await fetch("https://api.resend.com/emails",{method:"POST",
+      headers:{Authorization:"Bearer "+RESEND_API_KEY,"Content-Type":"application/json"},
+      body:JSON.stringify({from:FROM,to:[email],subject:zadeva,html,reply_to:"info@rabimbox.si"})});
+    if(!r.ok) return {ok:false,napaka:"E-pošte ni bilo mogoče poslati: "+(await r.text()).slice(0,200)};
+    return {ok:true,napaka:null};
+  }catch(e){return {ok:false,napaka:"E-pošte ni bilo mogoče poslati: "+String((e as Error).message||e)};}
+}

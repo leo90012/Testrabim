@@ -729,6 +729,19 @@
       render(`<div class="auth-wrap"><div class="auth-card"><div class="alert err">Ni bilo mogoče naložiti Supabase knjižnice (preveri internetno povezavo).</div></div></div>`); return;
     }
     state.sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+    // Povezava iz e-poste (rocno ustvarjen profil): ?token_hash=...&type=invite|recovery
+    const qp = new URLSearchParams(location.search);
+    const th = qp.get("token_hash"), tt = qp.get("type");
+    if (th && (tt === "invite" || tt === "recovery")) {
+      const { error } = await state.sb.auth.verifyOtp({ token_hash: th, type: tt });
+      try { history.replaceState({}, "", location.pathname); } catch (e) {}
+      if (error) {
+        state.needsPassword = false;
+        showAuth("login", "Povezava je potekla ali je bila že uporabljena. Za novo klikni »Pozabljeno geslo«.", "err");
+        return;
+      }
+      state.needsPassword = true;
+    }
     state.sb.auth.onAuthStateChange(async (event, session) => {
       state.session = session;
       if (event === "PASSWORD_RECOVERY") state.needsPassword = true;
