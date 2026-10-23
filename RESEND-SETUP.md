@@ -43,3 +43,12 @@ v glavi `apikey`; javni ključ iz profila ni primeren. SQL nastavitev je v
 Tabela `email_obvestila` preprečuje ponovno pošiljanje za isti termin.
 Ob neuspelem pošiljanju se zapis sprosti, da je možen ponoven poskus.
 Zaključni zahvalni e-mail uporablja povezavo za Google oceno v `REVIEW_URL`.
+
+
+## Dnevnik pošte (23. 10. 2026)
+
+Nova pošta iz poslji-obvestilo, sklad-rocni-vnos in rb-billing se beleži v zasebni tabeli rb_email_log. Admin jo vidi v skladišču pod E-pošta in računi, skupaj s plačanimi PDF računi. Enkratni žetoni vabil so v shranjeni vsebini skriti; takih povezav ni mogoče ponovno poslati iz posnetka.
+
+Promocijski CSV vsebuje le izrecne privolitve brez odjave. Izvoz vseh kontaktov je ločen in sam ne predstavlja privolitve za promocijsko pošto. Privolitev stranka ureja v svojem profilu.
+
+Ob preizkusu obstoječi RESEND_API_KEY omogoča pošiljanje, branje stare pošte pa vrne HTTP401. Zato je zanesljivo vidna vsa nova lokalno zabeležena pošta; starejša se uvozi samo z ustreznim dostopom in dokler jo ponudnik hrani. Gumb za uvoz vrne jasno napako, če branje ni omogočeno. Širšega ključa aplikacija ne ustvarja sama.

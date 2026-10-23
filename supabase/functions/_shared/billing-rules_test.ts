@@ -1,0 +1,11 @@
+import {strict as assert} from "node:assert";
+import {addDays,validDate,validateOrder,invoiceDescription,renewalPrice,csvCell,minDelivery} from "./billing-rules.ts";
+const order={tip:"izposoja",st_boxov:40,email:"USER@EXAMPLE.COM",ime:"Matic",priimek:"Test",naslov:"Testna 1",mesto:"Ljubljana",postna_stevilka:"1000",telefon:"040 111 222",datum_dostave:"2026-10-28",cas_dostave:"11:00",obmocje:"ljubljana",auto_renew_consent:true,terms_version:"2026-10-23"};
+Deno.test("30 dni tudi čez kratke mesece in konec leta",()=>{assert.equal(addDays("2026-01-31",30),"2026-03-02");assert.equal(addDays("2028-02-01",30),"2028-03-02");assert.equal(addDays("2026-12-15",30),"2027-01-14");});
+Deno.test("neveljavni datumi se ne normalizirajo",()=>{assert.equal(validDate("2026-02-30"),false);assert.throws(()=>addDays("2026-02-30",30));});
+Deno.test("ceno in naziv paketa določa strežnik",()=>{const r=validateOrder({...order,cena:1,paket:"1 EUR"},"2026-10-23");assert.equal(r.amount,109);assert.equal(r.order.paket,"Izposoja 40 boxov");assert.equal(r.order.email,"user@example.com");});
+Deno.test("vnos se preveri pred Stripe",()=>{for(const patch of [{st_boxov:1.5},{st_boxov:"40"},{st_boxov:-20},{tip:"drugo"},{email:"a\nb@c.si"},{obmocje:"tujina"},{auto_renew_consent:false},{datum_dostave:"2026-10-24"},{cas_dostave:"25:00"},{ime:"a".repeat(101)},{postna_stevilka:"abc"}])assert.throws(()=>validateOrder({...order,...patch},"2026-10-23"));});
+Deno.test("3 delovni dnevi in najmanj 3 boxi skladiščenja",()=>{assert.equal(minDelivery("2026-10-23"),"2026-10-28");assert.throws(()=>validateOrder({...order,tip:"skladiscenje",st_boxov:2},"2026-10-23"));assert.equal(validateOrder({...order,tip:"skladiscenje",st_boxov:3},"2026-10-23").amount,14.7);});
+Deno.test("obračunska meja je izključujoča",()=>{assert.equal(invoiceDescription("izposoja",40,"2026-10-25","2026-11-24"),"Izposoja 40 boxov - obdobje od 25.10.2026 do 23.11.2026");});
+Deno.test("delno vračilo uporabi nov paket za naslednje obdobje",()=>{assert.equal(renewalPrice("izposoja",35),109);assert.equal(renewalPrice("izposoja",20),69);assert.equal(renewalPrice("skladiscenje",20),84);assert.equal(renewalPrice("izposoja",0),0);});
+Deno.test("CSV ne izvede formule v Excelu",()=>{assert.equal(csvCell('=HYPERLINK("x")'),'"\'=HYPERLINK(""x"")"');assert.equal(csvCell("Miha"),'"Miha"');});

@@ -13,10 +13,14 @@ Deno.serve(async(req)=>{
   }catch(e){
     return new Response("Napačen podpis: "+String((e as Error).message||e),{status:400});
   }
+  if(["invoice.created","invoice.paid","invoice.payment_failed","invoice.payment_action_required","customer.subscription.deleted"].includes(event.type)){
+    const r=await fetch(URL+"/functions/v1/rb-billing",{method:"POST",headers:{Authorization:"Bearer "+SERVICE_ROLE,apikey:SERVICE_ROLE,"Content-Type":"application/json"},body:JSON.stringify({action:"event",event})});
+    return new Response(JSON.stringify({received:r.ok}),{status:r.ok?200:500,headers:{"Content-Type":"application/json"}});
+  }
   if(!["checkout.session.completed","checkout.session.async_payment_succeeded"].includes(event.type))
     return new Response(JSON.stringify({received:true}),{headers:{"Content-Type":"application/json"}});
   const session=event.data.object as Stripe.Checkout.Session;
-  if(session.payment_status!=="paid")
+  if(session.payment_status!=="paid"&&session.mode!=="setup")
     return new Response(JSON.stringify({received:true,paid:false}),{headers:{"Content-Type":"application/json"}});
   try{
     const res=await fetch(URL+"/functions/v1/rapid-api",{method:"POST",

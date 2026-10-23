@@ -21,7 +21,7 @@
   var STEPS=[["paketi","Paketi"],["termin","Termin"],["povzetek","Povzetek"]];
 
   var s={step:"choice",tip:null,plan:null,stBoxov:null,extras:{stopnice:false,krhko:false,pomoc:false,dvigalo:false},
-    opis:"",nadstropje:"",naslov:"",enota:"",postna:"",mesto:"",telefon:"",datum:"",cas:"",ime:"",priimek:"",email:"",geslo:"",racunMode:"novo",soglasje:false,loggedIn:false,loginHint:false,kontaktBack:null,kontaktZadeva:"",podjetje:"",davcna:""};
+    opis:"",nadstropje:"",naslov:"",enota:"",postna:"",mesto:"",telefon:"",datum:"",cas:"",ime:"",priimek:"",email:"",geslo:"",racunMode:"novo",soglasje:false,autoConsent:false,loggedIn:false,loginHint:false,kontaktBack:null,kontaktZadeva:"",podjetje:"",davcna:""};
 
   // Obmocje dostave: spletno placilo samo za Ljubljano; za ostalo Slovenijo in tujino stranka odda povprasevanje.
   var OBMOCJA=[
@@ -70,10 +70,10 @@
   // Prijavljena stranka lahko naroci samo z e-naslovom, s katerim je prijavljena.
   function emailPolje(placeholder){
     if(s.loggedIn&&s.sessionEmail){
-      return '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.sessionEmail)+'" readonly tabindex="-1" class="ro" />'+
+      return '<div class="field"><label>E-pošta</label><input type="email" id="email" maxlength="254" value="'+esc(s.sessionEmail)+'" readonly tabindex="-1" class="ro" />'+
         '<div class="hint">Prijavljen(a) si kot <b>'+esc(s.sessionEmail)+'</b>. Naročilo bo oddano na ta e-naslov. Za drug e-naslov se <button type="button" class="link-btn" id="odjava">odjavi</button>.</div></div>';
     }
-    return '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.email)+'"'+(placeholder?' placeholder="'+placeholder+'"':'')+' /></div>';
+    return '<div class="field"><label>E-pošta</label><input type="email" id="email" maxlength="254" value="'+esc(s.email)+'"'+(placeholder?' placeholder="'+placeholder+'"':'')+' /></div>';
   }
   document.addEventListener("click",async function(e){
     if(!e.target||e.target.id!=="odjava")return;
@@ -115,7 +115,7 @@
       if(p.contact){return '<div class="plan contact" data-plan="'+p.id+'"><div class="pt">'+esc(p.naziv)+'</div><div class="pp" style="font-size:18px">Po dogovoru</div><div class="pu">ponudba po meri</div><button type="button" class="btn small ghost pv-contact" data-naziv="'+esc(p.naziv)+'">Kontaktiraj nas</button></div>';}
       var isSel=s.plan===p.id;var sel=isSel?" sel":"";
       var price=izp?eur(p.cena):eur(p.perBox);
-      var unit=izp?"za 1 mesec (30 dni)":"na box / mesec";
+      var unit=izp?"za 30 dni":"na box / mesec";
       return '<div class="plan'+sel+'" data-plan="'+p.id+'"><div class="pcheck">'+ICON.check+'</div><div class="pt">'+esc(p.naziv)+'</div>'+
         '<div class="pp">'+price+'</div><div class="pu">'+unit+'</div>'+
         '<button class="btn small selbtn'+(isSel?"":" ghost")+'" data-id="'+p.id+'">'+(isSel?"Izbrano ✓":"Izberi")+'</button></div>';
@@ -143,7 +143,7 @@
     if(s.stBoxov>50)return '<div class="alert err" style="margin:0">Za več kot 50 boxov spletno naročilo ni mogoče – <a href="mailto:'+esc(CFG.SUPPORT_EMAIL||"info@rabimbox.si")+'?subject='+encodeURIComponent("Povpraševanje – skladiščenje nad 50 boxov")+'">kontaktirajte nas</a>.</div>';
     var p=planObj();return '<div class="calc-out"><div class="calc-plan">Paket: <b>'+(p?esc(p.naziv):"-")+'</b></div><div class="calc-price">'+eur(monthly())+'<span> / mesec</span></div><div class="calc-sub">'+s.stBoxov+' × '+eur(p?p.perBox:0)+' na box</div></div>';
   }
-  function canNextPaketi(){if(s.tip==="skladiscenje")return !!s.stBoxov&&s.stBoxov>=MIN_SKL&&s.stBoxov<=50;return !!s.plan;}
+  function canNextPaketi(){if(s.tip==="skladiscenje")return Number.isInteger(Number(s.stBoxov))&&!!s.stBoxov&&s.stBoxov>=MIN_SKL&&s.stBoxov<=50;return !!s.plan;}
 
   // ---- DODATKI ----
   function viewDodatki(){
@@ -204,16 +204,16 @@
       '<p class="co-sub">Vpiši kontaktne podatke, naslov ter izberi datum in uro.</p>'+progress("termin")+
       '<div class="split"><div>'+
       '<div class="card"><h3>Kontaktni podatki</h3>'+
-      '<div class="rowflex"><div class="field"><label>Ime</label><input id="ime" value="'+esc(s.ime)+'" /></div>'+
-      '<div class="field"><label>Priimek</label><input id="priimek" value="'+esc(s.priimek)+'" /></div></div>'+
-      '<div class="rowflex"><div class="field"><label>Naziv podjetja <span style="font-weight:400;color:var(--muted);font-size:12px">(neobvezno)</span></label><input id="podjetje" value="'+esc(s.podjetje)+'" placeholder="Za račun na podjetje" /></div>'+
-      '<div class="field"><label>Davčna številka <span style="font-weight:400;color:var(--muted);font-size:12px">(neobvezno)</span></label><input id="davcna" value="'+esc(s.davcna)+'" placeholder="SI12345678" /></div></div>'+
-      '<div class="rowflex"><div class="field"><label>Telefon</label><input id="telefon" value="'+esc(s.telefon)+'" placeholder="+386..." /></div>'+
+      '<div class="rowflex"><div class="field"><label>Ime</label><input id="ime" maxlength="100" value="'+esc(s.ime)+'" /></div>'+
+      '<div class="field"><label>Priimek</label><input id="priimek" maxlength="100" value="'+esc(s.priimek)+'" /></div></div>'+
+      '<div class="rowflex"><div class="field"><label>Naziv podjetja <span style="font-weight:400;color:var(--muted);font-size:12px">(neobvezno)</span></label><input id="podjetje" maxlength="200" value="'+esc(s.podjetje)+'" placeholder="Za račun na podjetje" /></div>'+
+      '<div class="field"><label>Davčna številka <span style="font-weight:400;color:var(--muted);font-size:12px">(neobvezno)</span></label><input id="davcna" maxlength="100" value="'+esc(s.davcna)+'" placeholder="SI12345678" /></div></div>'+
+      '<div class="rowflex"><div class="field"><label>Telefon</label><input id="telefon" maxlength="30" value="'+esc(s.telefon)+'" placeholder="+386..." /></div>'+
       emailPolje("ime@primer.si")+'</div>'+
       '<h3>Naslov dostave</h3>'+
       obmocjeHtml()+
-      '<div class="field"><label>Kraj dostave</label><input id="mesto" value="'+esc(s.mesto)+'" placeholder="Vpiši kraj" /></div>'+
-      '<div class="field"><label>Naslov za dostavo</label><input id="naslov" value="'+esc(s.naslov)+'" placeholder="Ulica in hišna številka" /></div>'+
+      '<div class="field"><label>Kraj dostave</label><input id="mesto" maxlength="100" value="'+esc(s.mesto)+'" placeholder="Vpiši kraj" /></div>'+
+      '<div class="field"><label>Naslov za dostavo</label><input id="naslov" maxlength="300" value="'+esc(s.naslov)+'" placeholder="Ulica in hišna številka" /></div>'+
       '</div>'+
       '<div class="card"><h3>Termin dostave</h3>'+
       '<div class="rowflex dt-row"><div class="field"><label>Datum dostave</label><input type="date" id="datum" min="'+minOrderDateStr()+'" value="'+esc(s.datum)+'" placeholder="Izberi delovni dan" /><div class="hint">Dostave pon–pet. Najzgodnejši možni termin je 3 delovne dni vnaprej.</div></div>'+
@@ -270,7 +270,7 @@
   // ---- POVZETEK ----
   function viewPovzetek(){
     var payLabel=s.loggedIn?"Plačaj zdaj":"Prijava / registracija";
-    var payHint=s.loggedIn?"Takoj rezerviraš termin – varno plačilo prvega meseca (Stripe).":"Ustvari račun ali se prijavi, nato nadaljuj na plačilo.";
+    var payHint=s.loggedIn?"Takoj rezerviraš termin – varno plačilo prvih 30 dni (Stripe).":"Ustvari račun ali se prijavi, nato nadaljuj na plačilo.";
     render('<h1 class="co-title"><button class="back-inline" data-back>‹</button>Povzetek</h1>'+
       '<p class="co-sub">Preveri podatke pred oddajo.</p>'+progress("povzetek")+
       '<div class="split"><div class="card">'+
@@ -286,14 +286,14 @@
       kv("Telefon",s.telefon)+
       kv("Termin",fmtDatum(s.datum)+" "+(s.cas||""))+
       '</div>'+summaryCard()+'</div>'+
-      '<label class="terms"><input type="checkbox" id="pz_soglasje" '+(s.soglasje?"checked":"")+' /> <span>Soglašam s <a href="../pravila-in-pogoji/" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>'+
+      '<label class="terms"><input type="checkbox" id="pz_soglasje" '+(s.autoConsent?"checked":"")+' /> <span>Soglašam s <a href="../pravila-in-pogoji/" target="_blank" rel="noopener">pogoji poslovanja</a>. Potrjujem prvo plačilo in samodejno bremenitev kartice vsakih 30 dni do prekinitve najema. Opomnik prejmem 5 dni pred obnovo.</span></label>'+
       '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button>'+
-      '<div class="cta-col"><button class="btn" id="pz_primary" '+(s.soglasje?"":"disabled")+'>'+payLabel+'</button>'+
+      '<div class="cta-col"><button class="btn" id="pz_primary" '+(s.autoConsent?"":"disabled")+'>'+payLabel+'</button>'+
       '<span class="cta-hint">'+payHint+'</span>'+
       '<button type="button" class="btn-link" id="inquiry">Oddaj povpraševanje – kontaktiramo te v 24 h →</button></div></div>');
     q$all("[data-back]").forEach(function(b){b.onclick=function(){s.step="termin";route();};});
-    var cb=q$("#pz_soglasje");if(cb)cb.onchange=function(e){s.soglasje=e.target.checked;var pb=q$("#pz_primary");if(pb)pb.disabled=!s.soglasje;};
-    var pb=q$("#pz_primary");if(pb)pb.onclick=function(){if(!s.soglasje){return;}if(s.loggedIn){submit();}else{openAuthModal();}};
+    var cb=q$("#pz_soglasje");if(cb)cb.onchange=function(e){s.autoConsent=e.target.checked;var pb=q$("#pz_primary");if(pb)pb.disabled=!s.autoConsent;};
+    var pb=q$("#pz_primary");if(pb)pb.onclick=function(){if(!s.autoConsent){return;}if(s.loggedIn){submit();}else{openAuthModal();}};
     var iq=q$("#inquiry");if(iq)iq.onclick=function(){s.step="povprasevanje";route();};
   }
   function kv(k,v){return '<div class="kv"><span class="k">'+esc(k)+'</span><span class="v">'+esc(v||"-")+'</span></div>';}
@@ -428,10 +428,10 @@
     render('<h1 class="co-title"><button class="back-inline" data-back>‹</button>Tvoji podatki</h1>'+
       '<p class="co-sub">Prijavljen(a) kot '+esc(s.email)+'. Podatki so izpolnjeni – po želji jih spremeni.</p>'+progress("racun")+
       '<div class="split"><div class="card">'+
-      '<div class="rowflex"><div class="field"><label>Ime</label><input id="ime" value="'+esc(s.ime)+'" /></div>'+
-      '<div class="field"><label>Priimek</label><input id="priimek" value="'+esc(s.priimek)+'" /></div></div>'+
+      '<div class="rowflex"><div class="field"><label>Ime</label><input id="ime" maxlength="100" value="'+esc(s.ime)+'" /></div>'+
+      '<div class="field"><label>Priimek</label><input id="priimek" maxlength="100" value="'+esc(s.priimek)+'" /></div></div>'+
       emailPolje("")+
-      '<div class="alert info">Po oddaji te preusmerimo na varno plačilo prvega meseca (Stripe).</div>'+
+      '<div class="alert info">Po oddaji te preusmerimo na varno plačilo prvih 30 dni (Stripe).</div>'+
       '</div>'+summaryCard()+'</div>'+
       '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button><button class="btn" id="submit">Plačilo</button></div>');
     q$all("[data-back]").forEach(function(b){b.onclick=function(){s.step="povzetek";route();};});
@@ -448,12 +448,12 @@
         '<button type="button" class="btn ghost" id="mPrijava">Imam račun</button>'+
       '</div>'+
       (s.loginHint?'<div class="alert info">V novem oknu se prijavi v svoj račun, nato se vrni sem – podatke bomo samodejno izpolnili.</div>':'')+
-      '<div class="rowflex"><div class="field"><label>Ime</label><input id="ime" value="'+esc(s.ime)+'" /></div>'+
-      '<div class="field"><label>Priimek</label><input id="priimek" value="'+esc(s.priimek)+'" /></div></div>'+
-      '<div class="field"><label>E-pošta</label><input type="email" id="email" value="'+esc(s.email)+'" placeholder="ime@primer.si" /></div>'+
+      '<div class="rowflex"><div class="field"><label>Ime</label><input id="ime" maxlength="100" value="'+esc(s.ime)+'" /></div>'+
+      '<div class="field"><label>Priimek</label><input id="priimek" maxlength="100" value="'+esc(s.priimek)+'" /></div></div>'+
+      '<div class="field"><label>E-pošta</label><input type="email" id="email" maxlength="254" value="'+esc(s.email)+'" placeholder="ime@primer.si" /></div>'+
       '<div class="field"><label>Geslo (za dostop do panela)</label><input type="password" id="geslo" value="'+esc(s.geslo||"")+'" placeholder="vsaj 6 znakov" minlength="6" /><div class="hint">Ustvarimo ti račun za spremljanje naročil v panelu Moj račun.</div></div>'+
       '<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#7b8794;margin:0 0 14px;cursor:pointer"><input type="checkbox" id="soglasje" '+(s.soglasje?"checked":"")+' style="margin-top:2px" /> <span>Soglašam s <a href="../pravila-in-pogoji/" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>'+
-      '<div class="alert info">Po oddaji te preusmerimo na varno plačilo prvega meseca (Stripe).</div>'+
+      '<div class="alert info">Po oddaji te preusmerimo na varno plačilo prvih 30 dni (Stripe).</div>'+
       '</div>'+summaryCard()+'</div>'+
       '<div class="nav-btns"><button class="btn ghost" data-back>Nazaj</button><button class="btn" id="submit">Plačilo</button></div>');
     q$all("[data-back]").forEach(function(b){b.onclick=function(){s.step="povzetek";route();};});
@@ -464,6 +464,7 @@
   }
 
   async function submit(){
+    if(!s.autoConsent){s.step="povzetek";route();alert("Potrdi samodejno plačevanje vsakih 30 dni, preden nadaljuješ na plačilo.");return;}
     var _hp=q$("#hp_order"); if(_hp&&_hp.value){return;}
     if(!s.email||s.email.indexOf("@")<0||!s.ime||!s.priimek||!s.naslov||!ljAllowed()||!s.mesto||!s.telefon||!s.datum||!s.cas){alert("Prosim izpolni vse podatke in termin (korak Termin).");s.step="termin";route();return;}
     if(!s.loggedIn){
@@ -484,7 +485,7 @@
       cena_opis:cenaOpis(),stopnice:false,krhko:false,pomoc_polnjenje:s.extras.pomoc,
       opis_lokacije:("Vrsta objekta: "+(s.opis||"-")+" | Nadstropje: "+(s.nadstropje||"-")+" | Dvigalo: "+(s.extras.dvigalo?"Da":"Ne")),naslov:s.naslov||null,enota:null,postna_stevilka:s.postna||null,mesto:s.mesto||null,telefon:s.telefon||null,
       datum_dostave:s.datum||null,cas_dostave:s.cas||null,ime:s.ime||null,priimek:s.priimek||null,
-      podjetje:s.podjetje||null,davcna:s.davcna||null,email:s.email,obmocje:s.obmocje||null};
+      podjetje:s.podjetje||null,davcna:s.davcna||null,email:s.email,obmocje:s.obmocje||null,auto_renew_consent:s.autoConsent===true,terms_version:"2026-10-23"};
     try{
       if(!sb)throw new Error("Supabase ni na voljo.");
       var scr=await sb.functions.invoke(CHECKOUT_FN,{body:{order:rec,pageUrl:location.origin+location.pathname}});

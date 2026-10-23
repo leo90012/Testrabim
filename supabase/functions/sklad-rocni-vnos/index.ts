@@ -1,5 +1,7 @@
 // Rocni profil in narocilo. Klice ga lahko samo prijavljeno osebje.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {text,email as validEmail,validDate} from "../_shared/billing-rules.ts";
+import {sendLoggedMail} from "../_shared/mail.ts";
 const URL=Deno.env.get("SUPABASE_URL")||"";
 const KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS"};
@@ -15,26 +17,27 @@ Deno.serve(async(req)=>{
     const staff=await sb.from("osebje").select("vloga").eq("user_id",auth.data.user.id).maybeSingle();
     if(staff.error||!staff.data) return json({error:"Samo osebje lahko ustvari ročni vnos."},403);
     const input=await req.json().catch(()=>({}));
-    const ime=String(input.ime||"").trim().slice(0,100);
-    const priimek=String(input.priimek||"").trim().slice(0,100);
-    const email=String(input.email||"").trim().toLowerCase();
-    const telefon=String(input.telefon||"").trim().slice(0,100);
-    const naslov=String(input.naslov||"").trim().slice(0,300);
-    const posta=String(input.postna_stevilka||"").trim().slice(0,30);
-    const mesto=String(input.mesto||"").trim().slice(0,100);
+    const ime=text(input.ime,100,true);
+    const priimek=text(input.priimek,100,true);
+    const email=validEmail(input.email);
+    const telefon=text(input.telefon,100,true);
+    const naslov=text(input.naslov,300,true);
+    const posta=text(input.postna_stevilka,4,true);
+    const mesto=text(input.mesto,100,true);
     if(!ime||!priimek||!telefon||!naslov||!posta||!mesto||!/^\S+@\S+\.\S+$/.test(email))
       throw new Error("Izpolnite ime, priimek, e-naslov, telefon in naslov.");
+    if(!/^\d{4}$/.test(posta)||!/^[+\d ()/.-]{6,30}$/.test(telefon))throw new Error("Preverite telefon in poštno številko.");
     const onlyProfile=input.only_profile===true;
     const tip=String(input.tip||"");
     const n=Number(input.st_boxov);
     const date=String(input.datum_dostave||"");
     const time=String(input.cas_dostave||"");
     if(!onlyProfile){
-      if(!["izposoja","skladiscenje"].includes(tip)||!Number.isInteger(n)||n<1||n>360)
+      if(!["izposoja","skladiscenje"].includes(tip)||!Number.isInteger(n)||n<1||n>5000||(tip==="skladiscenje"&&n<3))
         throw new Error("Neveljavna storitev ali stevilo boxov.");
       if(tip==="izposoja"&&![20,40,60,80].includes(n))
         throw new Error("Pri izposoji izberite paket 20, 40, 60 ali 80 boxov.");
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!/^\d{2}:\d{2}$/.test(time))
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||isNaN(Date.parse(date+"T12:00:00Z"))||new Date(date+"T12:00:00Z").toISOString().slice(0,10)!==date||[0,6].includes(new Date(date+"T12:00:00Z").getUTCDay())||date<new Date().toISOString().slice(0,10)||!/^(10|11|12|13|14):00$/.test(time))
         throw new Error("Izberite termin dostave.");
       const occupied=await sb.rpc("zasedeni_termini",{d:date});
       if(occupied.error) throw occupied.error;
@@ -55,6 +58,7 @@ Deno.serve(async(req)=>{
         postna_stevilka:posta,kraj:mesto,status_narocnine:"neaktivna"}).select("id").single();
       if(customer.error) throw customer.error;
     }
+    if(!customer.data)throw new Error("Profila ni bilo mogoče ustvariti.");
     if(onlyProfile){
       const poslano=await posljiDostop(email,ime,dostop,null);
       return json({ok:true,kupec_id:customer.data.id,povabilo:poslano.ok,email_napaka:poslano.napaka});
@@ -68,7 +72,7 @@ Deno.serve(async(req)=>{
       st_boxov:n,cena_opis:amount.toFixed(2).replace(".",",")+" €/mesec",
       ime,priimek,email,telefon,naslov,postna_stevilka:posta,mesto,
       datum_dostave:date,cas_dostave:time,
-      opis_lokacije:String(input.opomba||"").slice(0,1000),
+      opis_lokacije:text(input.opomba,1000),
       stevilka:ref,vir:"rocno",placano:false,status:"nova",kupec_id:customer.data.id,
     }).select("id,stevilka").single();
     if(order.error) throw order.error;
@@ -86,7 +90,7 @@ type Dostop={link:string;novo:boolean};
 
 // Nov uporabnik: povezava "invite". Obstojeci, ki se se ni prijavil: "recovery" (nastavi geslo).
 // Obstojeci, ki ze ima geslo: navadna povezava na prijavo.
-async function pripraviDostop(sb:ReturnType<typeof createClient>,email:string):Promise<Dostop>{
+async function pripraviDostop(sb:any,email:string):Promise<Dostop>{
   const inv=await sb.auth.admin.generateLink({type:"invite",email,options:{redirectTo:PANEL}});
   if(!inv.error&&inv.data?.properties?.hashed_token)
     return {link:PANEL+"?token_hash="+encodeURIComponent(inv.data.properties.hashed_token)+"&type=invite",novo:true};
@@ -137,10 +141,7 @@ async function posljiDostop(email:string,ime:string,d:Dostop,
   </div>`;
   const zadeva=nar?`Vaše naročilo ${nar.stevilka} – Rabimbox`:"Vaš profil pri Rabimbox";
   try{
-    const r=await fetch("https://api.resend.com/emails",{method:"POST",
-      headers:{Authorization:"Bearer "+RESEND_API_KEY,"Content-Type":"application/json"},
-      body:JSON.stringify({from:FROM,to:[email],subject:zadeva,html,reply_to:"info@rabimbox.si"})});
-    if(!r.ok) return {ok:false,napaka:"E-pošte ni bilo mogoče poslati: "+(await r.text()).slice(0,200)};
+    await sendLoggedMail(email,zadeva,html,[],"info@rabimbox.si");
     return {ok:true,napaka:null};
   }catch(e){return {ok:false,napaka:"E-pošte ni bilo mogoče poslati: "+String((e as Error).message||e)};}
 }

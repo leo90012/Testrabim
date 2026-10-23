@@ -181,7 +181,7 @@
         <div class="seg"><button data-mode="login" class="${mode === "login" ? "active" : ""}">Prijava</button><button data-mode="register" class="${isReg ? "active" : ""}">Registracija</button></div>
         ${msg ? `<div class="alert ${mt}">${msg}</div>` : ""}
         <form id="authForm">
-          <div class="field"><label>E-poštni naslov</label><input type="email" id="email" autocomplete="email" required placeholder="ime@primer.si" />${isReg ? `<div class="hint">Uporabi isti e-naslov, ki ga imaš v evidenci Rabimbox.</div>` : ""}</div>
+          <div class="field"><label>E-poštni naslov</label><input type="email" id="email" maxlength="254" autocomplete="email" required placeholder="ime@primer.si" />${isReg ? `<div class="hint">Uporabi isti e-naslov, ki ga imaš v evidenci Rabimbox.</div>` : ""}</div>
           ${!isMagic ? `<div class="field"><label>Geslo</label><input type="password" id="password" autocomplete="${isReg ? "new-password" : "current-password"}" required minlength="6" placeholder="********" /></div>` : `<div class="hint" style="margin-bottom:14px">Poslali ti bomo povezavo za prijavo brez gesla.</div>`}
           ${isReg ? `<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#7b8794;margin:2px 0 14px;cursor:pointer"><input type="checkbox" id="agree" style="margin-top:2px" /> <span>Soglašam s <a href="../pravila-in-pogoji/" target="_blank" rel="noopener">pogoji poslovanja</a>.</span></label>` : ""}
           <button class="btn primary" type="submit" id="authBtn">${isMagic ? "Pošlji povezavo" : isReg ? "Ustvari račun" : "Prijava"}</button>
@@ -299,29 +299,28 @@
     narocnine: () => state.sb.from("narocnine").select("*").eq("kupec_id", state.kupec.id).order("datum_do", { ascending: false }),
   };
   // Naročnina: obdobje 1 mesec. Če datum_do ni nastavljen, ga izračunamo iz datum_od + 1 mesec.
-  function addMonths(dateStr, n) {
+  function addDays(dateStr, n) {
     if (!dateStr) return null;
-    const d = new Date(dateStr);
+    const d = new Date(String(dateStr).slice(0,10) + "T12:00:00Z");
     if (isNaN(d)) return null;
-    d.setMonth(d.getMonth() + n);
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0,10);
   }
   // Veljavnost naročnine: vir resnice je tabela narocnine, kupci.* je samo odsev
   function narocninaDo(box) {
     if (box && box.narocnina_do) return box.narocnina_do;
     if (box && box.narocnina_id) {
       const m = (state.narocnine || []).find((x) => Number(x.id) === Number(box.narocnina_id));
-      if (m) return m.datum_do || addMonths(m.datum_od, 1);
+      if (m) return m.datum_do || addDays(m.datum_od, 30);
     }
     const n = (state.narocnine || []).filter((x) => (x.status || "") === "aktivna");
     if (n.length) {
       const dd = n.map((x) => x.datum_do).filter(Boolean).sort().pop();
       if (dd) return dd;
       const od = n.map((x) => x.datum_od).filter(Boolean).sort().pop();
-      if (od) return addMonths(od, 1);
+      if (od) return addDays(od, 30);
     }
     if (state.kupec && state.kupec.datum_konca_narocnine) return state.kupec.datum_konca_narocnine;
-    return addMonths(narocninaOd(), 1);
+    return addDays(narocninaOd(), 30);
   }
   function narocninaOd() {
     const n = (state.narocnine || []).filter((x) => (x.status || "") === "aktivna");
@@ -383,13 +382,44 @@
         <div class="kv"><span class="k">Status</span><span class="v">${subBadge}</span></div>
         <div class="kv"><span class="k">Začetek</span><span class="v">${fmtDate(narocninaOd())}</span></div>
         <div class="kv"><span class="k">Poteče / obnova</span><span class="v">${fmtDate(narocninaDo())}</span></div>
-        ${currentMonthly > 0 ? `<div class="kv"><span class="k">Trenutna mesečna cena</span><span class="v">${money(currentMonthly)}</span></div>` : ""}
-        ${nextPrices.map((x) => `<div class="kv"><span class="k">Od ${fmtDate(x.sprememba_od)} (${x.naslednje_st_boxov} boxov)</span><span class="v">${money(x.naslednja_cena)} / mesec</span></div>`).join("")}
+        ${currentMonthly > 0 ? `<div class="kv"><span class="k">Cena za trenutno 30-dnevno obdobje</span><span class="v">${money(currentMonthly)}</span></div>` : ""}
+        ${nextPrices.map((x) => `<div class="kv"><span class="k">Od ${fmtDate(x.sprememba_od)} (${x.naslednje_st_boxov} boxov)</span><span class="v">${money(x.naslednja_cena)} / 30 dni</span></div>`).join("")}
       </div>
+      ${billingOverview(ordersAll)}
       ${boxiSection}
       <div class="deliver-bar hidden" id="deliverBar"><div class="inner"></div></div>`;
   }
+  function billingOverview(orders) {
+    return orders.filter(o => !["zakljuceno","preklicano"].includes(o.status)).map(o => {
+      const n=(state.narocnine||[]).find(x=>Number(x.narocilo_id)===Number(o.id));
+      const label=o.is_test?"TESTNI NAJEM":n?.cancel_requested_at?"Vračilo najavljeno – naslednje podaljšanje ustavljeno":n?.billing_status==="past_due"?"Plačilo je treba urediti":n?.auto_renew?"Samodejna bremenitev vsakih 30 dni":"Samodejno plačilo še ni vključeno";
+      const action=o.is_test?"":n?.auto_renew?"portal":o.placano?"enroll":"pay";
+      return `<div class="card rb-billing-card"><h3>Naročilo ${esc(o.stevilka)}</h3><p>${esc(label)}</p>${n?.datum_od?`<div class="kv"><span class="k">Trenutno obdobje</span><span class="v">${fmtDate(n.datum_od)} – ${fmtDate(addDays(n.datum_do,-1))}</span></div>`:""}${n?.auto_renew?`<div class="kv"><span class="k">Naslednja bremenitev</span><span class="v">${fmtDate(n.datum_do)} · ${money(n.naslednja_cena??n.cena_mesecna)}</span></div>`:""}${action?`<button class="btn outline rb-billing-action" data-id="${o.id}" data-action="${action}">${action==="portal"?"Uredi kartico":action==="pay"?"Plačaj naročilo":"Vključi samodejno plačevanje"}</button>`:""}</div>`;
+    }).join("");
+  }
+  function wireBillingButtons(root=document) {
+    $$(".rb-billing-action",root).forEach(b=>b.addEventListener("click",async()=>{
+      if(b.dataset.action!=="portal"){
+        openSheet(`<h3>Samodejno plačevanje</h3><p>Najem se podaljšuje vsakih 30 dni. Pet dni pred bremenitvijo prejmeš opomnik. Pravočasno naročeno vračilo vseh boxov ustavi naslednje podaljšanje.</p><label class="terms"><input type="checkbox" id="rbAutoConsent"> Soglašam s <a href="../pravila-in-pogoji/" target="_blank" rel="noopener">pogoji poslovanja</a> in samodejno bremenitvijo kartice vsakih 30 dni do prekinitve.</label><p id="rbBillingError"></p><div class="rowflex"><button class="btn primary" id="rbBillingContinue" disabled>Nadaljuj</button><button class="btn outline" data-close>Zapri</button></div>`);
+        $("#rbAutoConsent").onchange=e=>{$("#rbBillingContinue").disabled=!e.target.checked;};
+        $("#rbBillingContinue").onclick=()=>runBilling(b.dataset.action,Number(b.dataset.id),$("#rbBillingContinue"));
+      }else await runBilling("portal",Number(b.dataset.id),b);
+    }));
+  }
+  async function runBilling(action,id,button){
+    button.disabled=true;
+    try{
+      let res;
+      if(action==="pay"){
+        const {data:o,error}=await state.sb.from("narocila").select("stevilka").eq("id",id).single();if(error)throw error;
+        res=await state.sb.functions.invoke("rapid-api",{body:{ref:o.stevilka,auto_renew_consent:true,terms_version:"2026-10-23"}});
+      }else res=await state.sb.functions.invoke("rb-billing",{body:{action,order_id:id,consent:true,terms_version:"2026-10-23"}});
+      if(res.error){const d=res.error.context&&await res.error.context.json().catch(()=>null);throw new Error(d?.error||res.error.message);}
+      if(!res.data?.url)throw new Error(res.data?.error||"Preusmeritev ni uspela.");window.location.href=res.data.url;
+    }catch(e){const box=$("#rbBillingError");if(box)box.textContent=e.message||String(e);else toast(e.message||String(e));button.disabled=false;}
+  }
   function wireNadzor() {
+    wireBillingButtons();
     const bar = $("#deliverBar"), inner = bar ? $(".inner", bar) : null, empty = $("#newOrderEmpty");
     if (empty) empty.addEventListener("click", () => { window.location.href = "../narocilo/"; });
     $$(".nchoice[data-view]").forEach((c) => c.addEventListener("click", () => {
@@ -493,19 +523,21 @@
   }
   function narociloRow(o) {
     const paid = o.placano === true;
-    const badge = paid ? `<span class="badge green">Plačano</span>` : `<span class="badge amber">Ročni vnos</span>`;
+    const badge = o.is_test ? `<span class="badge amber">TEST</span>` : paid ? `<span class="badge green">Plačano</span>` : `<span class="badge amber">Neplačano</span>`;
     const termin = o.datum_dostave ? (fmtDate(o.datum_dostave) + (o.cas_dostave ? " " + o.cas_dostave : "")) : "";
     return `<div class="row selectable order-row" data-oid="${o.id}" data-paid="${paid ? 1 : 0}"><span class="ico">${ICON.receipt}</span>
       <div class="main"><div class="t">Naročilo ${esc(o.stevilka || ("#" + o.id))} ${badge}</div>
       <div class="s">${esc(o.paket || "")}${o.cena_opis ? " · " + esc(o.cena_opis) : ""}${termin ? " · Termin: " + esc(termin) : ""}</div><div class="s">${reqStatusBadge(o.status)}</div></div>
       <span class="end"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="M9 6l6 6-6 6"/></svg></span></div>`;
   }
-  function openOrderDetails(o) {
+  async function openOrderDetails(o) {
+    const {data:billing}=await state.sb.rpc("rb_billing_order_details",{p_id:o.id});
     const paid = o.placano === true;
     const termin = o.datum_dostave ? (fmtDate(o.datum_dostave) + (o.cas_dostave ? " " + o.cas_dostave : "")) : "-";
     const rowKV = (k, v) => (v && v !== "-") ? `<div class="kv"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>` : "";
     openSheet(`<h3>Naročilo ${esc(o.stevilka || ("#" + o.id))}</h3>
-      <div class="kv"><span class="k">Način naročila</span><span class="v">${paid ? '<span class="badge green">Plačano prek spleta</span>' : '<span class="badge amber">Ročni vnos</span>'}</span></div>
+      <div class="kv"><span class="k">Način naročila</span><span class="v">${o.is_test?'<span class="badge amber">TEST</span>':o.vir==="rocno"?'<span class="badge amber">Ročni vnos</span>':'<span class="badge green">Spletno naročilo</span>'}</span></div>
+      ${billing?rowKV("Obdobje",fmtDate(billing.datum_od)+" – "+fmtDate(addDays(billing.datum_do,-1))):""}
       ${rowKV("Storitev", o.tip)}${rowKV("Paket", o.paket)}${rowKV("Cena", o.cena_opis)}${rowKV("Termin", termin)}
       ${rowKV("Naslov", o.naslov)}${rowKV("Poštna", o.postna_stevilka)}${rowKV("Mesto", o.mesto)}${rowKV("Telefon", o.telefon)}
       <div class="rowflex mt"><button class="btn outline-2" type="button" data-close>Zapri</button></div>`);
@@ -643,23 +675,23 @@
         if (paidRes.error) throw paidRes.error;
         const paidIds = new Set((paidRes.data || []).map((o) => String(o.id)));
         const paidRefs = new Set((paidRes.data || []).map((o) => String(o.stevilka || "")));
-        racuni = (data || []).filter((r) => (r.narocilo_id && paidIds.has(String(r.narocilo_id))) || paidRefs.has(String(r.stevilka || "")));
+        racuni = (data || []).filter((r) => (r.placano === true || ["placan","poslan","posiljanje"].includes(r.status)) && ((r.narocilo_id && paidIds.has(String(r.narocilo_id))) || paidRefs.has(String(r.stevilka || ""))));
         state.hasRacuni = true;
       } else state.hasRacuni = false;
     } catch { state.hasRacuni = false; }
     let body;
     if (racuni && racuni.length) body = `<div class="section-title">Računi</div><div class="card">${racuni.map(racRow).join("")}</div>`;
     else if (state.hasRacuni) body = emptyState("receipt", "Še ni plačanih računov", "Račun se prikaže po uspešnem plačilu.");
-    else body = `<div class="alert info">Modul za posamezne račune še ni vključen. V bazi lahko dodaš tabelo <code>racuni</code> (SQL je v <code>sql/setup.sql</code>) in računi se bodo samodejno prikazali tukaj.</div><a class="btn outline auto" href="mailto:${esc(CFG.SUPPORT_EMAIL || "")}?subject=Vprašanje%20glede%20računa">Vprašanje glede plačila</a>`;
+    else body = `<div class="alert info">Računov trenutno ni mogoče naložiti. Poskusi znova ali nam piši.</div><a class="btn outline auto" href="mailto:${esc(CFG.SUPPORT_EMAIL || "")}?subject=Vprašanje%20glede%20računa">Vprašanje glede plačila</a>`;
     return pageHead("racuni") + subCard + body;
   }
   function racRow(r) {
-    const naziv = "Račun " + (r.stevilka || ("#" + r.id));
+    const naziv = (r.is_test ? "TESTNI DOKUMENT " : "Račun ") + (r.stripe_stevilka || r.stevilka || ("#" + r.id));
     return `<div class="row"><span class="ico">${ICON.receipt}</span>
       <div class="main"><div class="t">${esc(naziv)}</div>
-      <div class="s">Izdan: ${fmtDate(r.datum_izdaje)}</div></div>
+      <div class="s">Izdan: ${fmtDate(r.datum_izdaje)}</div><div class="s">${esc(r.opis||"")}</div></div>
       <div class="end"><div style="font-weight:700;color:var(--heading)">${money(r.znesek, r.valuta || "EUR")}</div>
-      <div style="margin-top:4px"><span class="badge green">Plačano</span></div>
+      <div style="margin-top:4px"><span class="badge ${r.is_test?"amber":"green"}">${r.is_test?"Testni dokument":"Plačano"}</span></div>
       <div style="margin-top:6px"><button class="btn small outline rac-dl" type="button" data-st="${esc(r.stevilka || "")}">Prenesi PDF</button></div></div></div>`;
   }
   function wireRacuni() {
@@ -690,13 +722,14 @@
     const k = state.kupec;
     return `${pageHead("profil")}
       <div class="card"><h3>Moji podatki</h3><form id="profForm">
-        <div class="rowflex"><div class="field"><label>Ime</label><input id="p_ime" value="${esc(k.ime || "")}" /></div>
-        <div class="field"><label>Priimek</label><input id="p_priimek" value="${esc(k.priimek || "")}" /></div></div>
-        <div class="field"><label>Telefon</label><input id="p_telefon" value="${esc(k.telefon || "")}" placeholder="+386..." /></div>
-        <input type="hidden" id="p_naslov" value="${esc(k.naslov || "")}" />
-        <div class="rowflex"><div class="field"><label>Poštna številka</label><input id="p_posta" value="${esc(k.postna_stevilka || "")}" placeholder="1000" /></div>
-        <div class="field"><label>Kraj</label><input id="p_kraj" value="${esc(k.kraj || "")}" placeholder="Ljubljana" /></div></div>
+        <div class="rowflex"><div class="field"><label>Ime</label><input id="p_ime" maxlength="100" value="${esc(k.ime || "")}" /></div>
+        <div class="field"><label>Priimek</label><input id="p_priimek" maxlength="100" value="${esc(k.priimek || "")}" /></div></div>
+        <div class="field"><label>Telefon</label><input id="p_telefon" maxlength="30" value="${esc(k.telefon || "")}" placeholder="+386..." /></div>
+        <input type="hidden" id="p_naslov" maxlength="300" value="${esc(k.naslov || "")}" />
+        <div class="rowflex"><div class="field"><label>Poštna številka</label><input id="p_posta" maxlength="30" value="${esc(k.postna_stevilka || "")}" placeholder="" /></div>
+        <div class="field"><label>Kraj</label><input id="p_kraj" maxlength="100" value="${esc(k.kraj || "")}" placeholder="Ljubljana" /></div></div>
         <div class="field"><label>E-pošta</label><input value="${esc(k.email || state.session.user.email)}" disabled /><div class="hint">E-naslov je vezan na prijavo in ga tu ni mogoče spremeniti.</div></div>
+        <label class="terms"><input type="checkbox" id="p_marketing" ${k.marketing_consent&&!k.marketing_unsubscribed_at?"checked":""}> Želim prejemati promocijska sporočila Rabimbox. Odjavim se lahko kadarkoli.</label>
         <button class="btn primary auto" type="submit" id="profSave">Shrani spremembe</button></form></div>
       <div class="prof-logout"><a href="#" id="logoutBtn">Odjava iz računa</a></div>`;
   }
@@ -710,6 +743,9 @@
     };
     const { error } = await state.sb.from("kupci").update(patch).eq("id", state.kupec.id);
     if (error) { alert("Napaka: " + error.message); btn.disabled = false; btn.textContent = "Shrani spremembe"; return; }
+    const marketing=$("#p_marketing").checked;
+    const mr=await state.sb.rpc("rb_marketing_preference",{p_consent:marketing});
+    if(mr.error){toast("Podatki so shranjeni, nastavitev promocijskih sporočil pa ni uspela.");}else{state.kupec.marketing_consent=marketing;state.kupec.marketing_unsubscribed_at=marketing?null:new Date().toISOString();}
     Object.assign(state.kupec, patch); toast("Shranjeno ✓"); btn.disabled = false; btn.textContent = "Shrani spremembe";
   }
 
@@ -771,12 +807,13 @@
     state._placiloDone = true;
     try { history.replaceState({}, "", location.pathname); } catch (e) {}
     if (pl === "preklic") { toast("Plačilo je bilo preklicano. Naročilo ni potrjeno."); return; }
-    if (pl !== "uspeh" || !ref) return;
+    if (pl !== "uspeh" && pl !== "kartica") return;
     // 1) Strežniška potrditev (service-role -> obide RLS; preveri sejo pri Stripe)
     const sid = qp.get("session_id");
     if (sid) {
       try {
         const cr = await state.sb.functions.invoke("rapid-api", { body: { confirm: true, session_id: sid } });
+        if(cr?.data?.card_saved){toast("Kartica je potrjena. Samodejno plačevanje je vključeno.");return;}
         if (cr && !cr.error && cr.data && cr.data.ok && cr.data.paid === true) { toast("Plačilo je potrjeno. Račun je v potrditvenem e-sporočilu."); return; }
       } catch (e) {}
     }

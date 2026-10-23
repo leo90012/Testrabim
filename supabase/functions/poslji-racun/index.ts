@@ -8,6 +8,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+// @ts-ignore paket ima privzeti izvoz v izvajalnem okolju ESM.
 import fontkit from "https://esm.sh/@pdf-lib/fontkit@1.1.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -23,7 +24,7 @@ const FIRMA = {
   iban: "SI56 0201 2026 2090 861",
   swift: "LJBASI2X",
   banka: "NLB d.d.",
-  email: "narocila@rabimbox.si",
+  email: "info@rabimbox.si",
 };
 
 const cors = {
@@ -88,7 +89,7 @@ async function makePdf(r: any, kupecNaslov: string, predracun: boolean) {
   const HR = (yTop: number, x1 = M, x2 = width - M) =>
     page.drawLine({ start: { x: x1, y: height - yTop }, end: { x: x2, y: height - yTop }, thickness: 0.7, color: lineC });
 
-  const naslov = predracun ? "Predračun" : "Račun";
+  const naslov = r.is_test ? "TEST – NI RAČUN" : predracun ? "Predračun" : "Račun";
   const osnova = Number(r.osnova ?? 0), ddv = Number(r.ddv ?? 0), znesek = Number(r.znesek ?? 0);
   const cur = r.valuta || "EUR";
 
@@ -182,21 +183,29 @@ Deno.serve(async (req) => {
     query = inp.racun_id ? query.eq("id", inp.racun_id) : query.eq("stevilka", inp.stevilka);
     const { data: r, error } = await query.single();
     if (error || !r) throw new Error("Račun ni najden.");
-    const { data: paidOrder, error: paidError } = await sb.from("narocila").select("id")
-      .eq("stevilka", r.stevilka).eq("placano", true).limit(1).maybeSingle();
-    if (paidError || !paidOrder) throw new Error("Račun je na voljo šele po plačilu.");
+    if(r.placano!==true&&!["placan","poslan","posiljanje"].includes(String(r.status)))throw new Error("Račun je na voljo šele po plačilu.");
     const service = !!SERVICE_ROLE && tok === SERVICE_ROLE;
     if (!service) {
       const { data: auth, error: authError } = await sb.auth.getUser(tok);
-      if (authError || !auth.user?.email || auth.user.email.toLowerCase() !== String(r.email || "").toLowerCase()) {
+      const staff=auth.user?await sb.from("osebje").select("vloga").eq("user_id",auth.user.id).maybeSingle():null;
+      if (authError || !auth.user?.email || (auth.user.email.toLowerCase() !== String(r.email || "").toLowerCase()&&staff?.data?.vloga!=="admin")) {
         return new Response(JSON.stringify({ error: "Ni dovoljeno." }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
       }
+    }
+    if(!r.is_test&&!r.stripe_invoice_id&&r.narocilo_id){
+      const {data:order}=await sb.from("narocila").select("nacin_placila").eq("id",r.narocilo_id).maybeSingle();
+      if(order?.nacin_placila==="stripe_kartica")throw new Error("Račun je še v pripravi. Poskusite znova čez nekaj trenutkov.");
+    }
+    if(r.url_pdf&&/^https:\/\/(pay|invoice|files)\.stripe\.com\//.test(r.url_pdf)){
+      const remote=await fetch(r.url_pdf);if(!remote.ok)throw new Error("Stripe PDF ni dostopen.");
+      const bytes=new Uint8Array(await remote.arrayBuffer());let bin="";for(let i=0;i<bytes.length;i+=8192)bin+=String.fromCharCode(...bytes.subarray(i,i+8192));
+      return new Response(JSON.stringify({ok:true,pdf:btoa(bin),filename:"Racun-"+(r.stripe_stevilka||r.stevilka)+".pdf"}),{headers:{...cors,"Content-Type":"application/json"}});
     }
     let kupecNaslov = "";
     const { data: kup } = await sb.from("kupci").select("naslov,postna_stevilka,kraj")
       .eq("email", r.email).limit(1).maybeSingle();
     if (kup) kupecNaslov = [kup.naslov, [kup.postna_stevilka, kup.kraj].filter(Boolean).join(" ")].filter(Boolean).join(", ");
-    const pdf = await makePdf(r, kupecNaslov, false);
+    const pdf = await makePdf(r.is_test?{...r,opis:"TESTNI DOKUMENT – NI RAČUN. "+(r.opis||"")}:r, kupecNaslov, false);
     return new Response(JSON.stringify({ ok: true, pdf, filename: "Racun-" + r.stevilka + ".pdf" }), { headers: { ...cors, "Content-Type": "application/json" } });
   } catch (e) {
     return new Response(JSON.stringify({ error: String((e as Error).message || e) }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
