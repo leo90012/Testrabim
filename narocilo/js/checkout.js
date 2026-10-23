@@ -189,7 +189,8 @@
     if(nb)nb.onclick=function(){
       if(!ljAllowed()){alert("Izberi območje dostave. Spletno plačilo je mogoče samo za naročila po Ljubljani.");return;}
       if(!s.ime||!s.priimek||!s.naslov||!s.mesto||!s.telefon){alert("Prosim izpolni ime, priimek, telefon, kraj in naslov dostave.");return;}
-      if(!s.email||s.email.indexOf("@")<1){alert("Prosim vpiši veljaven e-naslov.");return;}
+      if(!s.email||!(/^[^@\s]+@[^@\s]+\.[^@\s]+$/).test(s.email)){alert("Prosim vpiši veljaven e-naslov.");return;}
+      if(!/^\d{4}$/.test(s.postna)){alert("Poštna številka mora imeti 4 številke.");return;}
       if(!s.datum||!s.cas){alert("Prosim izberi datum in uro.");return;}
       if(s.datum<minOrderDateStr()){alert("Najzgodnejši možni termin je 3 delovne dni od danes. Prosim izberi kasnejši datum.");return;}
       if(isWeekend(s.datum)){alert("Dostave so samo od ponedeljka do petka. Prosim izberi delovni dan.");s.datum="";s.cas="";route();return;}
@@ -212,7 +213,8 @@
       emailPolje("ime@primer.si")+'</div>'+
       '<h3>Naslov dostave</h3>'+
       obmocjeHtml()+
-      '<div class="field"><label>Kraj dostave</label><input id="mesto" maxlength="100" value="'+esc(s.mesto)+'" placeholder="Vpiši kraj" /></div>'+
+      '<div class="rowflex"><div class="field"><label for="postna">Poštna številka</label><input id="postna" inputmode="numeric" autocomplete="postal-code" maxlength="4" value="'+esc(s.postna)+'" /></div>'+
+      '<div class="field"><label>Kraj dostave</label><input id="mesto" maxlength="100" value="'+esc(s.mesto)+'" placeholder="Vpiši kraj" /></div></div>'+
       '<div class="field"><label>Naslov za dostavo</label><input id="naslov" maxlength="300" value="'+esc(s.naslov)+'" placeholder="Ulica in hišna številka" /></div>'+
       '</div>'+
       '<div class="card"><h3>Termin dostave</h3>'+
@@ -224,7 +226,7 @@
       '</div>'+
       '</div>'+summaryCard()+'</div>'+
       '<div id="terminNav">'+terminNavHtml()+'</div>');
-    ["ime","priimek","podjetje","davcna","naslov","mesto","telefon","email"].forEach(function(id){var e=q$("#"+id);if(e)e.oninput=function(ev){s[id]=ev.target.value;};});
+    ["ime","priimek","podjetje","davcna","naslov","postna","mesto","telefon","email"].forEach(function(id){var e=q$("#"+id);if(e)e.oninput=function(ev){s[id]=ev.target.value;};});
     // Kljukice delujejo kot enojna izbira: ob izbiri ene se ostali odznacita.
     q$all(".obm-cb").forEach(function(cb){cb.onchange=function(){
       s.obmocje=cb.checked?cb.value:"";
@@ -466,7 +468,7 @@
   async function submit(){
     if(!s.autoConsent){s.step="povzetek";route();alert("Potrdi samodejno plačevanje vsakih 30 dni, preden nadaljuješ na plačilo.");return;}
     var _hp=q$("#hp_order"); if(_hp&&_hp.value){return;}
-    if(!s.email||s.email.indexOf("@")<0||!s.ime||!s.priimek||!s.naslov||!ljAllowed()||!s.mesto||!s.telefon||!s.datum||!s.cas){alert("Prosim izpolni vse podatke in termin (korak Termin).");s.step="termin";route();return;}
+    if(!s.email||s.email.indexOf("@")<0||!s.ime||!s.priimek||!s.naslov||!ljAllowed()||!/^\d{4}$/.test(s.postna)||!s.mesto||!s.telefon||!s.datum||!s.cas){alert("Prosim izpolni vse podatke in termin (korak Termin).");s.step="termin";route();return;}
     if(!s.loggedIn){
       if(!s.geslo||s.geslo.length<6){alert("Vpiši geslo (vsaj 6 znakov) za svoj račun.");s.step="racun";route();return;}
       if(!s.soglasje){alert("Za ustvarjanje računa moraš soglašati s pogoji poslovanja.");s.step="racun";route();return;}
@@ -550,7 +552,7 @@
       levo='<h4>Kaj lahko shranjujem?</h4><p>Shranjujete lahko vse stvari, ki jih lahko spravite v naš box velikosti: Dolžine: 60, Širine: 40, Višine: 44 cm. Prepovedano je shranjevati krhke predmete, hrano in pijačo, vnetljive predmete, kemikalije in vse predmete, ki so zakonsko prepovedani.</p>';
     }
     return '<div class="info-2"><div>'+levo+'</div>'+
-      '<div><h4>Prevzemi in dostave</h4><p>Dostave in prevzemi so od ponedeljka do petka. Termin uskladimo vsaj 48 ur vnaprej.</p></div></div>';
+      '<div><h4>Prevzemi in dostave</h4><p>Dostave in prevzemi so od ponedeljka do petka. Termin uskladimo vsaj 3 delovne dni vnaprej.</p></div></div>';
   }
 
   function q$(sel){return APP.querySelector(sel);}
