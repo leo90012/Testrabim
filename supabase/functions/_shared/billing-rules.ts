@@ -39,7 +39,7 @@ export function validateOrder(raw:any,today:string){
   for(const f of ["ime","priimek","naslov","mesto","telefon"])order[f]=text(raw[f],f==="naslov"?300:100,true);
   if(!/^\+?[\d ()/.-]{6,30}$/.test(String(order.telefon)))throw new Error("Telefon ni veljaven.");
   for(const f of ["podjetje","davcna","opis_lokacije","enota","postna_stevilka"])order[f]=text(raw[f],f==="opis_lokacije"?2000:200)||null;
-  if(!/^\d{4}$/.test(String(order.postna_stevilka||"")))throw new Error("Poštna številka mora imeti 4 številke.");
+  if(order.postna_stevilka&&!/^\d{4}$/.test(String(order.postna_stevilka)))throw new Error("Poštna številka mora imeti 4 številke.");
   return {order,amount};
 }
 export function invoiceDescription(tip:string,n:number,start:string,endExclusive:string){
