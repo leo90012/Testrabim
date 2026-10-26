@@ -385,7 +385,6 @@
         ${currentMonthly > 0 ? `<div class="kv"><span class="k">Cena za trenutno 30-dnevno obdobje</span><span class="v">${money(currentMonthly)}</span></div>` : ""}
         ${nextPrices.map((x) => `<div class="kv"><span class="k">Od ${fmtDate(x.sprememba_od)} (${x.naslednje_st_boxov} boxov)</span><span class="v">${money(x.naslednja_cena)} / 30 dni</span></div>`).join("")}
       </div>
-      ${billingOverview(ordersAll)}
       ${boxiSection}
       <div class="deliver-bar hidden" id="deliverBar"><div class="inner"></div></div>`;
   }
@@ -394,7 +393,7 @@
       const n=(state.narocnine||[]).find(x=>Number(x.narocilo_id)===Number(o.id));
       const label=o.is_test?"TESTNI NAJEM":n?.cancel_requested_at?"Vračilo najavljeno – naslednje podaljšanje ustavljeno":n?.billing_status==="past_due"?"Plačilo je treba urediti":n?.auto_renew?"Samodejna bremenitev vsakih 30 dni":"Samodejno plačilo še ni vključeno";
       const action=o.is_test?"":n?.auto_renew?"portal":o.placano?"enroll":"pay";
-      return `<div class="card rb-billing-card"><h3>Naročilo ${esc(o.stevilka)}</h3><p>${esc(label)}</p>${n?.datum_od?`<div class="kv"><span class="k">Trenutno obdobje</span><span class="v">${fmtDate(n.datum_od)} – ${fmtDate(addDays(n.datum_do,-1))}</span></div>`:""}${n?.auto_renew?`<div class="kv"><span class="k">Naslednja bremenitev</span><span class="v">${fmtDate(n.datum_do)} · ${money(n.naslednja_cena??n.cena_mesecna)}</span></div>`:""}${action?`<button class="btn outline rb-billing-action" data-id="${o.id}" data-action="${action}">${action==="portal"?"Uredi kartico":action==="pay"?"Plačaj naročilo":"Vključi samodejno plačevanje"}</button>`:""}</div>`;
+      return `<div class="rb-billing-card" style="padding:0 16px 16px"><p>${esc(label)}</p>${n?.datum_od?`<div class="kv"><span class="k">Trenutno obdobje</span><span class="v">${fmtDate(n.datum_od)} – ${fmtDate(addDays(n.datum_do,-1))}</span></div>`:""}${n?.auto_renew?`<div class="kv"><span class="k">Naslednja bremenitev</span><span class="v">${fmtDate(n.datum_do)} · ${money(n.naslednja_cena??n.cena_mesecna)}</span></div>`:""}${action?`<button class="btn outline rb-billing-action" data-id="${o.id}" data-action="${action}">${action==="portal"?"Uredi kartico":action==="pay"?"Plačaj naročilo":"Vključi samodejno plačevanje"}</button>`:""}</div>`;
     }).join("");
   }
   function wireBillingButtons(root=document) {
@@ -419,7 +418,6 @@
     }catch(e){const box=$("#rbBillingError");if(box)box.textContent=e.message||String(e);else toast(e.message||String(e));button.disabled=false;}
   }
   function wireNadzor() {
-    wireBillingButtons();
     const bar = $("#deliverBar"), inner = bar ? $(".inner", bar) : null, empty = $("#newOrderEmpty");
     if (empty) empty.addEventListener("click", () => { window.location.href = "../narocilo/"; });
     $$(".nchoice[data-view]").forEach((c) => c.addEventListener("click", () => {
@@ -500,10 +498,14 @@
 
   async function viewNarocila() {
     const email = (state.session && state.session.user && state.session.user.email) || (state.kupec && state.kupec.email) || "";
-    let orders = [];
-    try { const { data } = await state.sb.from("narocila").select("*").eq("email", email).order("id", { ascending: false }); orders = (data || []).filter((o) => (o.placano === true || o.vir === "rocno") && !((o.status || "").toLowerCase().includes("preklic"))); } catch (e) {}
-    let zahteve = [];
-    try { const { data } = await q.narocila(); zahteve = data || []; } catch (e) {}
+    const [ordersRes, zahteveRes, narocnineRes] = await Promise.all([
+      Promise.resolve(state.sb.from("narocila").select("*").eq("email", email).order("id", { ascending: false })).catch(() => ({ data: [] })),
+      Promise.resolve(q.narocila()).catch(() => ({ data: [] })),
+      Promise.resolve(q.narocnine()).catch(() => ({ data: [] })),
+    ]);
+    const orders = (ordersRes.data || []).filter((o) => (o.placano === true || o.vir === "rocno") && !((o.status || "").toLowerCase().includes("preklic")));
+    const zahteve = zahteveRes.data || [];
+    state.narocnine = narocnineRes.data || [];
     state._orders = orders;
     const grouped = new Map(orders.map((o) => [Number(o.id), []]));
     const legacy = [];
@@ -513,7 +515,7 @@
     });
     const narocilaCard = orders.length ? `<div class="section-title">Moja naročila</div>${orders.map((o) => {
       const related = grouped.get(Number(o.id)) || [];
-      return `<div class="card" style="margin-bottom:14px">${narociloRow(o)}${related.length ? `<div style="padding:0 16px 12px 54px"><div class="s" style="font-weight:700;margin:8px 0">Zahteve za prevoz (${related.length})</div>${related.map(orderRow).join("")}</div>` : ""}</div>`;
+      return `<div class="card" style="margin-bottom:14px">${narociloRow(o)}${billingOverview([o])}${related.length ? `<div style="padding:0 16px 12px 54px"><div class="s" style="font-weight:700;margin:8px 0">Zahteve za prevoz (${related.length})</div>${related.map(orderRow).join("")}</div>` : ""}</div>`;
     }).join("")}` : "";
     const zahteveCard = legacy.length ? `<div class="section-title">Stare zahteve brez povezave z naročilom</div><div class="card">${legacy.map(orderRow).join("")}</div>` : "";
     const prazno = (!orders.length && !zahteve.length) ? emptyState("truck", "Še nimaš oddanih naročil", "Ko oddaš naročilo, se bo skupaj s statusom plačila prikazalo tukaj.") : "";
@@ -543,6 +545,7 @@
       <div class="rowflex mt"><button class="btn outline-2" type="button" data-close>Zapri</button></div>`);
   }
   function wireNarocila() {
+    wireBillingButtons();
     const b = $("#newOrderBtn"); if (b) b.addEventListener("click", () => { window.location.href = "../narocilo/"; });
     $$(".seg-filter button").forEach((btn) => btn.addEventListener("click", () => {
       $$(".seg-filter button").forEach((x) => x.classList.remove("active")); btn.classList.add("active");
