@@ -1,4 +1,5 @@
 -- Izoliran preizkus v transakciji. ROLLBACK prepreči tudi oddajo HTTP obvestil.
+begin;
 do $test$
 declare
   v_customer bigint; v_email text; v_staff uuid; v_order bigint; v_sub bigint;
@@ -69,3 +70,4 @@ begin
   if not exists(select 1 from net.http_request_queue where id>v_queue and url like '%/poslji-obvestilo' and convert_from(body,'UTF8')::jsonb->>'faza'='vrnitev') then raise exception 'TEST: mail ob vrnitvi je izklopljen';end if;
 end$test$;
 select 'PASS: interna potrditev, podvojeni/prekrivajoči zahtevki, preklic, ločeni boxi, tuji dostop, fizični premiki, ročna prva dostava in ohranjena ostala obvestila' as rezultat;
+rollback;
