@@ -13,7 +13,7 @@ const date = (d:Date) => d.toISOString().slice(0,10);
 function price(tip:string,n:number){return renewalPrice(tip,n);}
 async function invoiceSetup(client:Stripe,o:any,key:string){
   const description=invoiceDescription(o.tip,o.st_boxov,String(o.datum_dostave).slice(0,10),addDays(String(o.datum_dostave).slice(0,10),30));
-  const customer=await client.customers.create({email:o.email,name:o.podjetje||[o.ime,o.priimek].filter(Boolean).join(" "),phone:o.telefon,
+  const customer=await client.customers.create({preferred_locales:["sl"],email:o.email,name:o.podjetje||[o.ime,o.priimek].filter(Boolean).join(" "),phone:o.telefon,
     address:{line1:o.naslov,line2:o.enota||undefined,postal_code:o.postna_stevilka,city:o.mesto,country:"SI"},metadata:{rabimbox_ref:key}},{idempotencyKey:"rb-customer-"+key});
   const taxes=await client.taxRates.list({active:true,limit:100});
   const vat=taxes.data.find((t:Stripe.TaxRate)=>t.inclusive&&t.percentage===22&&t.country==="SI")||await client.taxRates.create({display_name:"DDV",percentage:22,inclusive:true,country:"SI"},{idempotencyKey:"rabimbox-vat-si-22-inclusive"});
@@ -99,7 +99,7 @@ Deno.serve(async(req)=>{
       const {data:manualSub}=await sb.from("narocnine").select("datum_do").eq("narocilo_id",o.id).limit(1).maybeSingle();
       if(manualSub?.datum_do&&manualSub.datum_do<=date(new Date()))throw new Error("Obdobje naročila je že poteklo. Kontaktirajte nas.");
       const details=await invoiceSetup(stripe,o,ref);
-      const session=await stripe.checkout.sessions.create({mode:"payment",payment_method_types:["card"],customer:details.customer,payment_intent_data:{setup_future_usage:"off_session"},invoice_creation:{enabled:true,invoice_data:{description:details.description,footer:"Rabim d.o.o. · info@rabimbox.si",...(o.davcna?{custom_fields:[{name:"Davčna številka",value:text(o.davcna,100,true)}]}:{})}},
+      const session=await stripe.checkout.sessions.create({locale:"sl",mode:"payment",payment_method_types:["card"],customer:details.customer,payment_intent_data:{setup_future_usage:"off_session"},invoice_creation:{enabled:true,invoice_data:{description:details.description,footer:"Rabim d.o.o. · info@rabimbox.si",...(o.davcna?{custom_fields:[{name:"Davčna številka",value:text(o.davcna,100,true)}]}:{})}},
         line_items:[{quantity:1,price_data:{currency:"eur",unit_amount:Math.round(amount*100),tax_behavior:"inclusive",product_data:{name:details.description}},tax_rates:[details.vat]}],
         metadata:{ref,auto_renew:"30d",terms:TERMS_VERSION},
         success_url:PANEL+"?placilo=uspeh&ref="+encodeURIComponent(ref)+"&session_id={CHECKOUT_SESSION_ID}",cancel_url:PANEL+"?placilo=preklic&ref="+encodeURIComponent(ref)});
@@ -130,7 +130,7 @@ Deno.serve(async(req)=>{
     let session:Stripe.Checkout.Session;
     try{
       const details=await invoiceSetup(stripe,order,ref),description=details.description;
-      session=await stripe.checkout.sessions.create({mode:"payment",payment_method_types:["card"],customer:details.customer,payment_intent_data:{setup_future_usage:"off_session"},invoice_creation:{enabled:true,invoice_data:{description,footer:"Rabim d.o.o. · info@rabimbox.si",...(order.davcna?{custom_fields:[{name:"Davčna številka",value:String(order.davcna)}]}:{})}},
+      session=await stripe.checkout.sessions.create({locale:"sl",mode:"payment",payment_method_types:["card"],customer:details.customer,payment_intent_data:{setup_future_usage:"off_session"},invoice_creation:{enabled:true,invoice_data:{description,footer:"Rabim d.o.o. · info@rabimbox.si",...(order.davcna?{custom_fields:[{name:"Davčna številka",value:String(order.davcna)}]}:{})}},
         line_items:[{quantity:1,price_data:{currency:"eur",unit_amount:Math.round(amount*100),
           tax_behavior:"inclusive",product_data:{name:description}},tax_rates:[details.vat]}],
         metadata:{draft_id:draft.data.id,ref,auto_renew:"30d",terms:TERMS_VERSION},

@@ -2,6 +2,7 @@ import Stripe from "https://esm.sh/stripe@14?target=deno";
 import {createClient} from "https://esm.sh/@supabase/supabase-js@2";
 import {addDays,invoiceDescription,renewalPrice,text,csvCell,TERMS_VERSION} from "../_shared/billing-rules.ts";
 import {sendLoggedMail,escapeHtml as esc} from "../_shared/mail.ts";
+import {ensureSlovenianDocuments} from "../_shared/stripe-language.ts";
 const URL=Deno.env.get("SUPABASE_URL")||"",KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 const PANEL="https://test.rabimbox.si/moj-profil/";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization,apikey,x-client-info,content-type","Access-Control-Allow-Methods":"POST,OPTIONS"};
@@ -27,6 +28,8 @@ export async function startRenewal(session:Stripe.Checkout.Session){
   const sub=await checked<any>(sb.from("narocnine").select("*").eq("narocilo_id",o.id).order("id",{ascending:false}).limit(1).single());
   if(session.metadata?.auto_renew!=="30d")return;
   const client=stripe(o.is_test),start=String(o.datum_dostave).slice(0,10),end=addDays(start,30);
+  const customerId=typeof session.customer==="string"?session.customer:session.customer?.id;
+  if(customerId)await ensureSlovenianDocuments(client,customerId);
   let subscription:Stripe.Subscription;
   if(sub.stripe_subscription_id){subscription=await client.subscriptions.retrieve(sub.stripe_subscription_id);}
   else{
@@ -123,6 +126,8 @@ async function processEvent(event:Stripe.Event){
     if(event.type==="invoice.created"){
       const inv=event.data.object as Stripe.Invoice;
       if(inv.subscription){const sid=typeof inv.subscription==="string"?inv.subscription:inv.subscription.id;const {data:n}=await sb.from("narocnine").select("*").eq("stripe_subscription_id",sid).maybeSingle();if(n){
+        const customer=typeof inv.customer==="string"?inv.customer:inv.customer?.id;
+        if(customer)await ensureSlovenianDocuments(stripe(n.is_test),customer);
         await reconcileOrder(n.narocilo_id);
         const client=stripe(n.is_test),o=await checked<any>(sb.from("narocila").select("status").eq("id",n.narocilo_id).single());
         const stop=["zakljuceno","preklicano"].includes(o.status)||n.status!=="aktivna"||await checked<boolean>(sb.rpc("rb_return_stops_renewal",{p_order:n.narocilo_id}));
@@ -208,7 +213,7 @@ async function testSetup(){
     const n=await checked<any>(sb.from("narocnine").select("*").eq("narocilo_id",o.id).limit(1).single());
     if(!n.stripe_subscription_id){
       const clock=await client.testHelpers.testClocks.create({name:fixture.ref,frozen_time:stamp(today())},{idempotencyKey:"clock-"+fixture.ref});
-      const customer=await client.customers.create({name:fixture.name+" – TEST",email:fixture.email,test_clock:clock.id,payment_method:"pm_card_visa",invoice_settings:{default_payment_method:"pm_card_visa"},metadata:{rabimbox_test:"true",rabimbox_order:String(o.id)}},{idempotencyKey:"customer-"+fixture.ref});
+      const customer=await client.customers.create({preferred_locales:["sl"],name:fixture.name+" – TEST",email:fixture.email,test_clock:clock.id,payment_method:"pm_card_visa",invoice_settings:{default_payment_method:"pm_card_visa"},metadata:{rabimbox_test:"true",rabimbox_order:String(o.id)}},{idempotencyKey:"customer-"+fixture.ref});
       const price=await getPrice(client,"izposoja",fixture.count,renewalPrice("izposoja",fixture.count));
       const sub=await client.subscriptions.create({customer:customer.id,default_payment_method:String(customer.invoice_settings.default_payment_method),items:[{price}],trial_end:stamp(n.datum_do),proration_behavior:"none",default_tax_rates:[await getVat(client)],metadata:{rabimbox_order:String(o.id),rabimbox_test:"true",ref:fixture.ref}},{idempotencyKey:"subscription-"+fixture.ref});
       if(sub.livemode)throw new Error("Test ne sme ustvariti prave naročnine.");
@@ -271,7 +276,8 @@ Deno.serve(async req=>{
       const n=await checked<any>(sb.from("narocnine").select("stripe_customer_id").eq("narocilo_id",o.id).not("stripe_customer_id","is",null).limit(1).single());
       const client=stripe(o.is_test),configs=await client.billingPortal.configurations.list({active:true,limit:100});
       const cfg=configs.data.find((c:any)=>c.metadata?.rabimbox==="30d")||await client.billingPortal.configurations.create({metadata:{rabimbox:"30d"},business_profile:{headline:"Rabimbox – kartica in računi"},features:{payment_method_update:{enabled:true},invoice_history:{enabled:false}}},{idempotencyKey:"rb-portal-30d"});
-      const p=await client.billingPortal.sessions.create({customer:n.stripe_customer_id,return_url:PANEL,configuration:cfg.id});return json({url:p.url});
+      await ensureSlovenianDocuments(client,n.stripe_customer_id);
+      const p=await client.billingPortal.sessions.create({customer:n.stripe_customer_id,locale:"sl",return_url:PANEL,configuration:cfg.id});return json({url:p.url});
     }
     if(action==="enroll"){
       if(body.consent!==true||body.terms_version!==TERMS_VERSION)throw new Error("Potrdite samodejno plačilo vsakih 30 dni.");
@@ -280,8 +286,9 @@ Deno.serve(async req=>{
       if(["zakljuceno","preklicano"].includes(o.status)||!o.placano)throw new Error("Za to naročilo kartice ni mogoče vključiti.");
       const n=await checked<any>(sb.from("narocnine").select("*").eq("narocilo_id",o.id).order("id",{ascending:false}).limit(1).single());
       if(n.auto_renew)throw new Error("Samodejno plačilo je že vključeno.");if(!n.datum_do||n.datum_do<=today())throw new Error("Obdobje je že poteklo; kontaktirajte nas.");
-      const client=stripe(o.is_test),customer=n.stripe_customer_id|| (await client.customers.create({email:o.email,name:[o.ime,o.priimek].filter(Boolean).join(" "),metadata:{rabimbox_order:String(o.id)}},{idempotencyKey:"rb-enroll-customer-"+o.id})).id;
-      const session=await client.checkout.sessions.create({mode:"setup",currency:"eur",customer,payment_method_types:["card"],metadata:{ref:o.stevilka,auto_renew:"30d",terms:TERMS_VERSION},success_url:PANEL+"?placilo=kartica&session_id={CHECKOUT_SESSION_ID}",cancel_url:PANEL});return json({url:session.url});
+      const client=stripe(o.is_test),customer=n.stripe_customer_id|| (await client.customers.create({preferred_locales:["sl"],email:o.email,name:[o.ime,o.priimek].filter(Boolean).join(" "),metadata:{rabimbox_order:String(o.id)}},{idempotencyKey:"rb-enroll-customer-"+o.id})).id;
+      await ensureSlovenianDocuments(client,customer);
+      const session=await client.checkout.sessions.create({locale:"sl",mode:"setup",currency:"eur",customer,payment_method_types:["card"],metadata:{ref:o.stevilka,auto_renew:"30d",terms:TERMS_VERSION},success_url:PANEL+"?placilo=kartica&session_id={CHECKOUT_SESSION_ID}",cancel_url:PANEL});return json({url:session.url});
     }
     if(!admin&&!service)return json({error:"Samo administrator."},403);
     if(action==="test_setup")return json(await testSetup());
@@ -297,8 +304,21 @@ Deno.serve(async req=>{
       return json({ok:true,webhook:"enabled",enabled:body.enable===true});
     }
     if(action==="admin_list"){
-      const offset=Math.max(0,Math.min(100000,Number(body.offset)||0));
-      const [emails,invoices]=await Promise.all([checked<any[]>(sb.from("rb_email_log").select("id,recipient,subject,status,error,created_at,sent_at,attachment_name,narocilo_id,racun_id,is_test").order("id",{ascending:false}).range(offset,offset+99)),checked<any[]>(sb.from("racuni").select("*").order("id",{ascending:false}).range(offset,offset+99))]);return json({emails,invoices,has_more:emails.length===100||invoices.length===100});
+      const offset=Math.max(0,Math.min(100000,Math.floor(Number(body.offset)||0))),section=body.section||"all";
+      if(!["all","emails","invoices"].includes(section))throw new Error("Neveljaven zavihek.");
+      const [emails,invoices]=await Promise.all([section!=="invoices"?checked<any[]>(sb.from("rb_email_log").select("id,recipient,subject,status,error,created_at,sent_at,attachment_name,narocilo_id,racun_id,is_test").order("id",{ascending:false}).range(offset,offset+100)):Promise.resolve([]),section!=="emails"?checked<any[]>(sb.from("racuni").select("*").order("id",{ascending:false}).range(offset,offset+100)):Promise.resolve([])]);
+      return json({emails:emails.slice(0,100),invoices:invoices.slice(0,100),has_more:emails.length>100||invoices.length>100});
+    }
+    if(action==="document_language"){
+      const linked=await checked<any[]>(sb.from("narocnine").select("stripe_customer_id,is_test").not("stripe_customer_id","is",null));
+      const result={ok:true,language:"sl",checked:0,changed:0,errors:[] as string[]};
+      for(const test of [false,true]){
+        const client=stripe(test),ids=new Set<string>(linked.filter(n=>!!n.is_test===test).map(n=>n.stripe_customer_id));
+        // Dodamo tudi prvotna plačila brez povezane naročnine; drugih Stripe strank ne spreminjamo.
+        for await(const c of client.customers.list({limit:100})){if(c.metadata?.rabimbox_ref||c.metadata?.rabimbox_order||c.metadata?.rabimbox_test)ids.add(c.id);}
+        for(const id of ids){try{result.checked++;if(body.apply===true&&await ensureSlovenianDocuments(client,id))result.changed++;}catch(e){result.errors.push(id+": "+(e as Error).message);}}
+      }
+      result.ok=result.errors.length===0;return json(result);
     }
     if(action==="history_import")return json(await importEmailHistory(text(body.after,100)));
     if(action==="admin_email")return json(await readEmail(Number(body.id)));
