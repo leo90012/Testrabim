@@ -119,10 +119,9 @@
 
   function reqProgress(s, pickup) {
     const key = String(s || "nova").toLowerCase();
-    const stage = key === "zakljuceno" || key === "zakljucena" ? 3
-      : key === "pri_stranki" || key === "v_skladiscu" ? 2
-      : key === "caka_dostavo" || key === "potrjeno" || key === "potrjena" ? 1 : 0;
-    const steps = ["Oddano", "Potrjeno", pickup ? "Prevzeto" : "Dostavljeno", "Zaključeno"];
+    const stage = key === "zakljuceno" || key === "zakljucena" ? 2
+      : key === "pri_stranki" || key === "v_skladiscu" ? 1 : 0;
+    const steps = ["Oddano", pickup ? "Prevzeto" : "Dostavljeno", "Zaključeno"];
     return `<div class="s">${steps.map((label, i) =>
       `<span${i === stage ? ' style="font-weight:700;color:var(--heading)"' : ""}>${i < stage ? "✓ " : ""}${label}</span>`
     ).join(' <span aria-hidden="true">→</span> ')}</div>`;
@@ -296,6 +295,7 @@
       return state.sb.from("skatle").select("*").eq("kupec_id", state.kupec.id).order("id");
     },
     narocila: () => state.sb.from("zahteve_dostave").select("*").eq("kupec_id", state.kupec.id).order("datum_zahteve", { ascending: false }),
+    pendingTransport: () => state.sb.rpc("rb_pending_transport_boxes"),
     narocnine: () => state.sb.from("narocnine").select("*").eq("kupec_id", state.kupec.id).order("datum_do", { ascending: false }),
   };
   // Naročnina: obdobje 1 mesec. Če datum_do ni nastavljen, ga izračunamo iz datum_od + 1 mesec.
@@ -330,7 +330,9 @@
 
   async function viewNadzor() {
     const k = state.kupec;
-    const [{ data: boxiAll = [] }, { data: narocila = [] }, narRes] = await Promise.all([q.boxi(), q.narocila(), Promise.resolve(q.narocnine()).catch(() => ({ data: [] }))]);
+    const [{ data: boxiAll = [] }, { data: narocila = [] }, narRes, pendingRes] = await Promise.all([q.boxi(), q.narocila(), Promise.resolve(q.narocnine()).catch(() => ({ data: [] })), q.pendingTransport()]);
+    if (pendingRes.error) throw pendingRes.error;
+    state._pendingTransport = new Set((pendingRes.data || []).map((x) => Number(x.skatla_id)));
     state.narocnine = (narRes && narRes.data) || [];
     const email = (state.session && state.session.user && state.session.user.email) || k.email || "";
     let ordersAll = [];
@@ -360,11 +362,12 @@
     const aktivna = narocila.filter((z) => { const s = (z.status || "").toLowerCase(); return !s.includes("zakljuc") && !s.includes("zaključ") && !s.includes("preklic") && !s.includes("dostavlj"); }).length;
     const rowH = (b) => {
       const reserved = String(b.status || "").toLowerCase() === "rezervirana";
-      return `<${reserved ? "div" : "label"} class="row${reserved ? "" : " selectable"}">${reserved ? "" : `<input type="checkbox" class="check box-check" value="${b.id}" data-status="${esc(String(b.status || "").toLowerCase())}" data-storage="${isStorage(b) ? 1 : 0}" />`}
-      <span class="main"><span class="t">Box ${esc(b.barkoda || ("#" + b.id))}</span></span>
-      <span class="end">${boxStatusBadge(b.status)}</span></${reserved ? "div" : "label"}>`;
+      const pending = state._pendingTransport.has(Number(b.id)), selectable = !reserved && !pending;
+      return `<${selectable ? "label" : "div"} class="row${selectable ? " selectable" : ""}">${selectable ? `<input type="checkbox" class="check box-check" value="${b.id}" data-status="${esc(String(b.status || "").toLowerCase())}" data-storage="${isStorage(b) ? 1 : 0}" />` : ""}
+      <span class="main"><span class="t">Box ${esc(b.barkoda || ("#" + b.id))}</span>${pending ? '<span class="s">Prevoz je že naročen</span>' : ""}</span>
+      <span class="end">${boxStatusBadge(b.status)}</span></${selectable ? "label" : "div"}>`;
     };
-    const group = (title, arr, gkey) => arr.length ? `<div class="section-title">${title} (${arr.length}) ${arr.some((b) => String(b.status || "").toLowerCase() !== "rezervirana") ? '<button class="btn outline small" id="selAllBoxes" type="button" style="margin-left:8px">Izberi vse</button>' : ""}</div><div class="card" data-group="${gkey}">${arr.map(rowH).join("")}</div>` : "";
+    const group = (title, arr, gkey) => arr.length ? `<div class="section-title">${title} (${arr.length}) ${arr.some((b) => String(b.status || "").toLowerCase() !== "rezervirana" && !state._pendingTransport.has(Number(b.id))) ? '<button class="btn outline small" id="selAllBoxes" type="button" style="margin-left:8px">Izberi vse</button>' : ""}</div><div class="card" data-group="${gkey}">${arr.map(rowH).join("")}</div>` : "";
     let boxiSection;
     if (!boxi.length) {
       boxiSection = `<p class="page-sub">Pregled tvojih boxov in naročnine.</p>${emptyState("truck", "Še nimaš aktivnih boxov", "", '<button class="btn primary auto" id="newOrderEmpty" style="margin:16px auto 0">Novo naročilo</button>')}`;
@@ -557,11 +560,12 @@
   function orderRow(z) {
     const vrsta = String(z.opomba || "").split(" - ")[0] || "Prevoz";
     const pickup = /skladišče|vračilo|prevzem/i.test(vrsta);
+    const customerStatus = ["caka_dostavo", "potrjena", "potrjeno", "v_izvajanju"].includes(String(z.status || "").toLowerCase()) ? "nova" : z.status;
     return `<div class="row"><span class="ico">${ICON.truck}</span>
       <div class="main"><div class="t">${esc(vrsta)} #${z.id}</div>
       <div class="s">Oddano: ${fmtDate(z.datum_zahteve, true)}${z.datum_dostave ? " · Termin: " + fmtDate(z.datum_dostave) : ""}</div>
-      ${reqProgress(z.status, pickup)}</div>
-      <div class="end">${reqStatusBadge(z.status)}</div></div>`;
+      ${reqProgress(customerStatus, pickup)}</div>
+      <div class="end">${reqStatusBadge(customerStatus)}</div></div>`;
   }
   function showSetPassword() {
     render(`<div class="auth-wrap"><div class="auth-logo"><a class="logo-link" href="${HOME}" aria-label="Na domačo stran">${logoImg()}</a><h1>Nastavi geslo</h1></div>
@@ -612,6 +616,7 @@
   };
   async function newOrder(ids, action) {
     ids = Array.isArray(ids) ? ids : [];
+    if (ids.some((id) => state._pendingTransport?.has(Number(id)))) { toast("Za izbrane boxe je prevoz že naročen. Počakaj na izvedbo ali preklic zahtevka."); return; }
     const a = REQ_ACTIONS[action] || REQ_ACTIONS.vracilo;
     openSheet(`<h3>${esc(a.title)}</h3><form id="orderForm">
       <div class="field"><label>${esc(a.addr)}</label><input id="oAddr" placeholder="Ulica in hišna številka, kraj" value="${esc((state.kupec && state.kupec.naslov) || "")}" /></div>

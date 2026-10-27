@@ -212,6 +212,9 @@ Deno.serve(async (req) => {
     // Obvestilo STRANKI ob dostavi/prevzemu (samo service_role -> DB trigger)
     if (tip === "dostava" || tip === "prevzem") {
       if (!isService(req)) throw new Error("Ni dovoljeno.");
+      if (tip === "dostava" && body.faza !== "vrnitev") {
+        return new Response(JSON.stringify({ok:true,preskoceno:"Prva dostava: pogodbo pošljemo ročno."}),{headers:{...cors,"Content-Type":"application/json"}});
+      }
       const to = body.email;
       if (!to) throw new Error("Manjka email.");
       const ime = body.ime ? ` ${esc(body.ime)}` : "";
