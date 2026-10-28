@@ -1,12 +1,15 @@
 import {strict as assert} from "node:assert";
 import {deliveryContractContent,validateContractAttachments,deliveryRequestKey,CONTRACT_MAX_BYTES} from "./delivery-contract.ts";
 
-Deno.test("dostavni mail ohrani zadevo, gumb in dopolni pogodbo brez HTML v imenih",()=>{
+Deno.test("dostavni mail uporabi novo besedilo pogodbe brez podatkov o stanju boxov",()=>{
   const draft=deliveryContractContent({ime:'Matic <img src=x>',email:'preview@example.invalid',st_boxov:40,st_boxov_dejansko:20});
+  assert.equal(draft.to,"preview@example.invalid");
   assert.equal(draft.subject,"Boxi so pri vas – Rabimbox");
-  assert(draft.body.includes('Matic &lt;img src=x&gt;'));assert(!draft.body.includes('<img'));
-  assert(draft.body.includes('(20 boxov)'));assert(draft.body.includes('pogodbe, ki ste jo podpisali'));
-  assert(draft.body.includes('href="https://test.rabimbox.si/moj-profil/"'));
+  assert.equal(draft.title,"Boxi so pri vas");
+  assert(draft.body.includes('Pozdravljeni, boxe smo dostavili na vaš naslov. V priponki se nahaja sken pogodbe o sodelovanju.'));
+  assert(draft.body.includes('Želimo vam prijetno uporabo!<br>Ekipa Rabimbox'));
+  assert(!draft.body.includes('Matic'));assert(!draft.body.includes('<img'));
+  assert(!draft.body.includes('boxov'));assert(!draft.body.includes('Moj račun'));
 });
 Deno.test("veljavni PDF in skenirane slike ostanejo nespremenjeni",()=>{
   const files=[{filename:'Pogodba.pdf',content:btoa('%PDF-1.7\nTEST')},{filename:'sken.jpg',content:btoa('\xff\xd8\xfftest')},{filename:'sken.png',content:btoa('\x89PNG\r\n\x1a\ntest')}];

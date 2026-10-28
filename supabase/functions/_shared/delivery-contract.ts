@@ -1,17 +1,11 @@
 export const CONTRACT_MAX_BYTES = 10 * 1024 * 1024;
 export type ContractAttachment = {filename:string;content:string};
-const esc=(value:unknown)=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]!));
 
 export function deliveryContractContent(order:any){
-  const name=order.ime?" "+esc(order.ime):"";
-  const count=Number(order.st_boxov_dejansko??order.st_boxov);
-  const quantity=count>0?` (${count} boxov)`:"";
   return {
     to:String(order.email||""),subject:"Boxi so pri vas – Rabimbox",title:"Boxi so pri vas",
-    body:`<p style="font-size:14px;line-height:1.6;margin:0 0 6px">Pozdravljeni${name}, vaše boxe smo dostavili na dogovorjeni naslov. Zdaj so pri vas.</p>
-      <p style="font-size:13.5px;color:#7b8794;line-height:1.6;margin:0">Stanje${quantity} lahko spremljate v Mojem računu.</p>
-      <p style="font-size:14px;line-height:1.6;margin:16px 0 0">V priponki vam pošiljamo kopijo pogodbe, ki ste jo podpisali ob dostavi.</p>
-      <div style="margin:22px 0 6px"><a href="https://test.rabimbox.si/moj-profil/" style="display:inline-block;background:#6ec1e4;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:8px;font-size:14px">Moj račun</a></div>`
+    body:`<p style="font-size:14px;line-height:1.6;margin:0 0 16px">Pozdravljeni, boxe smo dostavili na vaš naslov. V priponki se nahaja sken pogodbe o sodelovanju.</p>
+      <p style="font-size:14px;line-height:1.6;margin:0">Želimo vam prijetno uporabo!<br>Ekipa Rabimbox</p>`
   };
 }
 
