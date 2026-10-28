@@ -103,11 +103,7 @@ async function saveInvoice(inv:Stripe.Invoice){
   await invoiceMail(id,o);
 }
 async function invoiceAttachment(r:any){
-  if(r.url_pdf&&/^https:\/\/(pay|invoice|files)\.stripe\.com\//.test(r.url_pdf)){
-    const response=await fetch(r.url_pdf);if(!response.ok)throw new Error("PDF ni dostopen.");
-    const bytes=new Uint8Array(await response.arrayBuffer());let bin="";for(let i=0;i<bytes.length;i+=8192)bin+=String.fromCharCode(...bytes.subarray(i,i+8192));
-    return {filename:"Racun-"+(r.stripe_stevilka||r.stevilka)+".pdf",content:btoa(bin)};
-  }
+  // Prvo plačilo, podaljšanje in prenos uporabljajo isto slovensko predlogo.
   const res=await fetch(URL+"/functions/v1/poslji-racun",{method:"POST",headers:{Authorization:"Bearer "+KEY,apikey:KEY,"Content-Type":"application/json"},body:JSON.stringify({racun_id:r.id,download:true})});
   const data=await res.json();if(!res.ok||!data.pdf)throw new Error("Priponka računa ni pripravljena.");return {filename:data.filename,content:data.pdf};
 }
