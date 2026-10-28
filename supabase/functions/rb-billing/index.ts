@@ -3,6 +3,7 @@ import {createClient} from "https://esm.sh/@supabase/supabase-js@2";
 import {addDays,invoiceDescription,renewalPrice,text,csvCell,TERMS_VERSION} from "../_shared/billing-rules.ts";
 import {sendLoggedMail,escapeHtml as esc} from "../_shared/mail.ts";
 import {ensureSlovenianDocuments} from "../_shared/stripe-language.ts";
+import {STRIPE_INVOICE_FOOTER} from "../_shared/invoice-issuer.ts";
 const URL=Deno.env.get("SUPABASE_URL")||"",KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 const PANEL="https://test.rabimbox.si/moj-profil/";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization,apikey,x-client-info,content-type","Access-Control-Allow-Methods":"POST,OPTIONS"};
@@ -135,7 +136,7 @@ async function processEvent(event:Stripe.Event){
         if(inv.status==="draft"&&stop){await client.invoices.update(inv.id,{auto_advance:false,metadata:{rabimbox_hold:"Pravočasno vračilo ali zaključek naročila"}});}
         else if(line&&inv.status==="draft"&&line.period.end-line.period.start===30*86400){
           const count=n.naslednje_st_boxov??n.st_boxov,description=invoiceDescription(n.tip,count,iso(line.period.start),iso(line.period.end)),amount=renewalPrice(n.tip,count);
-          await client.invoices.update(inv.id,{description,footer:"Rabimbox · info@rabimbox.si",metadata:{rb_box_count:String(count)}});
+          await client.invoices.update(inv.id,{description,footer:STRIPE_INVOICE_FOOTER,metadata:{rb_box_count:String(count)}});
           // Stripe pri vrstici naročnine dovoljuje samo davčne popravke.
           // Obdobje je v memo opisu in v standardnem izpisu obdobja vrstice.
           const adjustment=Math.round(amount*100)-inv.total;
