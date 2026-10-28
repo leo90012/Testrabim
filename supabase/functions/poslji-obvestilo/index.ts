@@ -7,6 +7,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {sendLoggedMail} from "../_shared/mail.ts";
+import {deliveryContractContent,validateContractAttachments,deliveryRequestKey} from "../_shared/delivery-contract.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -87,6 +88,26 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const tip = String(body.tip || "");
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
+    // Oblikovan dostavni mail ostane ročen: osebje doda sken in klikne Pošlji.
+    if(tip==="dostava_osnutek"||tip==="dostava_pogodba"){
+      if(!isService(req)){
+        const token=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
+        const auth=await sb.auth.getUser(token);
+        const staff=auth.data.user?await sb.from("osebje").select("user_id").eq("user_id",auth.data.user.id).maybeSingle():null;
+        if(auth.error||!staff?.data)return new Response(JSON.stringify({error:"Nimate dovoljenja."}),{status:403,headers:{...cors,"Content-Type":"application/json"}});
+      }
+      const id=Number(body.narocilo_id);
+      if(!Number.isSafeInteger(id)||id<1)throw new Error("Neveljavno naročilo.");
+      const {data:order,error}=await sb.from("narocila").select("id,stevilka,ime,email,status,st_boxov,st_boxov_dejansko,is_test").eq("id",id).single();
+      if(error||!order||!["pri_stranki","v_skladiscu","zakljuceno"].includes(order.status))throw new Error("Najprej potrdi dejansko dostavo boxov.");
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(order.email||"")))throw new Error("Naročilo nima veljavnega e-naslova stranke.");
+      const draft=deliveryContractContent(order),html=ovoj(draft.title,draft.body);
+      if(tip==="dostava_osnutek")return new Response(JSON.stringify({ok:true,to:draft.to,subject:draft.subject,html}),{headers:{...cors,"Content-Type":"application/json"}});
+      if(body.send_confirmed!==true)throw new Error("Potrdi ročno pošiljanje sporočila.");
+      const attachments=validateContractAttachments(body.attachments),key=deliveryRequestKey(order.id,body.request_id);
+      const result=await sendLoggedMail(draft.to,draft.subject,html,attachments,"info@rabimbox.si",{key,orderId:order.id,test:order.is_test});
+      return new Response(JSON.stringify({ok:true,skipped:!!result.skipped}),{headers:{...cors,"Content-Type":"application/json"}});
+    }
     if(body.ref){const {data:testOrder}=await sb.from("narocila").select("is_test").eq("stevilka",String(body.ref)).maybeSingle();if(testOrder?.is_test)return new Response(JSON.stringify({ok:true,preskoceno:"testno naročilo"}),{headers:{...cors,"Content-Type":"application/json"}});}
 
     if (tip === "placilo") {
