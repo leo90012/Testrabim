@@ -259,6 +259,11 @@ svg { display: block; }
 .kv .k { color: var(--muted); }
 .kv .v { color: var(--heading); font-weight: 600; text-align: right; }
 
+/* Lokacija boxov: filter velja za trenutno izbrano storitev. */
+.box-status-filter button { min-width: 0; min-height: 44px; padding: 9px 6px; font-size: 13px; }
+.box-status-filter button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+#boxList [data-box-location][hidden], #emptyBoxFilter[hidden], #selAllBoxes[hidden] { display: none; }
+
 /* ===== Mobilna optimizacija ===== */
 button, .btn, a.btn, .row.selectable, .nchoice, .tab { -webkit-tap-highlight-color: rgba(0,0,0,.06); }
 @media (max-width: 600px) {

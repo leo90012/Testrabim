@@ -18,7 +18,7 @@
     </nav>
     <div class="foot-copy">&copy;2024 Rabimbox. Vse pravice pridržane.</div>
   </footer>`;
-  const state = { sb: null, session: null, kupec: null, tab: "nadzor", hasRacuni: null, boxView: null, narocnine: null,
+  const state = { sb: null, session: null, kupec: null, tab: "nadzor", hasRacuni: null, boxView: null, boxFilter: "all", narocnine: null,
     needsPassword: /(?:^|[&#?])type=(invite|recovery)(?:&|$)/.test(location.hash + location.search) };
 
   // Prikaz gesla: vsakemu polju za geslo (tudi kasneje narisanemu) dodamo gumb z ocesom.
@@ -78,6 +78,8 @@
     poskodovana:  { label: "V pregledu",              color: "gray" },
     umaknjena:    { label: "Umaknjeno",               color: "gray" },
   };
+  // Rezervirani boxi so še v skladišču; potrditev prevoza lokacije ne spremeni.
+  const boxLocation = (b) => String(b.status || "").toLowerCase() === "rezervirana" ? "v_skladiscu" : String(b.status || "").toLowerCase();
   function boxStatusBadge(s) {
     const key = String(s || "").toLowerCase();
     const m = BOX_STATUS[key];
@@ -350,6 +352,8 @@
         (status === "rezervirana" && reservedSubs.has(Number(b.narocnina_id)));
     });
     state._boxes = boxi;
+    const warehouseCount = boxi.filter((b) => boxLocation(b) === "v_skladiscu").length;
+    const customerCount = boxi.filter((b) => boxLocation(b) === "pri_stranki").length;
     const subStarted = (state.narocnine || []).some((x) => x.datum_od && String(x.status || "").toLowerCase() === "aktivna");
     const subBadge = subStarted ? subStatusBadge("aktivna") : (ordersAll.length ? subStatusBadge("v dostavi") : subStatusBadge(k.status_narocnine));
     const activeSubs = (state.narocnine || []).filter((x) => x.status === "aktivna");
@@ -363,16 +367,24 @@
     const rowH = (b) => {
       const reserved = String(b.status || "").toLowerCase() === "rezervirana";
       const pending = state._pendingTransport.has(Number(b.id)), selectable = !reserved && !pending;
-      return `<${selectable ? "label" : "div"} class="row${selectable ? " selectable" : ""}">${selectable ? `<input type="checkbox" class="check box-check" value="${b.id}" data-status="${esc(String(b.status || "").toLowerCase())}" data-storage="${isStorage(b) ? 1 : 0}" />` : ""}
+      const hidden = state.boxFilter !== "all" && boxLocation(b) !== state.boxFilter;
+      return `<${selectable ? "label" : "div"} class="row${selectable ? " selectable" : ""}" data-box-location="${esc(boxLocation(b))}"${hidden ? " hidden" : ""}>${selectable ? `<input type="checkbox" class="check box-check" value="${b.id}" data-status="${esc(String(b.status || "").toLowerCase())}" data-storage="${isStorage(b) ? 1 : 0}" />` : ""}
       <span class="main"><span class="t">Box ${esc(b.barkoda || ("#" + b.id))}</span>${pending ? '<span class="s">Prevoz je že naročen</span>' : ""}</span>
       <span class="end">${boxStatusBadge(b.status)}</span></${selectable ? "label" : "div"}>`;
     };
-    const group = (title, arr, gkey) => arr.length ? `<div class="section-title">${title} (${arr.length}) ${arr.some((b) => String(b.status || "").toLowerCase() !== "rezervirana" && !state._pendingTransport.has(Number(b.id))) ? '<button class="btn outline small" id="selAllBoxes" type="button" style="margin-left:8px">Izberi vse</button>' : ""}</div><div class="card" data-group="${gkey}">${arr.map(rowH).join("")}</div>` : "";
+    const group = (title, arr, gkey) => {
+      if (!arr.length) return "";
+      const visible = arr.filter((b) => state.boxFilter === "all" || boxLocation(b) === state.boxFilter);
+      const filters = [["all", "Vsi", arr.length], ["v_skladiscu", "V skladišču", arr.filter((b) => boxLocation(b) === "v_skladiscu").length], ["pri_stranki", "Pri vas", arr.filter((b) => boxLocation(b) === "pri_stranki").length]];
+      return `<div class="seg box-status-filter" role="group" aria-label="Filtriraj boxe po lokaciji">${filters.map(([value, label, count]) => `<button type="button" data-box-filter="${value}" class="${state.boxFilter === value ? "active" : ""}" aria-pressed="${state.boxFilter === value}">${label} (${count})</button>`).join("")}</div>
+        <div class="section-title">${title} (<span id="visibleBoxCount">${visible.length}</span>) <button class="btn outline small" id="selAllBoxes" type="button" style="margin-left:8px"${visible.some((b) => String(b.status || "").toLowerCase() !== "rezervirana" && !state._pendingTransport.has(Number(b.id))) ? "" : " hidden"}>Izberi vse</button></div>
+        <div class="card" id="boxList" data-group="${gkey}">${arr.map(rowH).join("")}<p class="muted" id="emptyBoxFilter" role="status"${visible.length ? " hidden" : ""}>Za izbrano lokacijo ni boxov.</p></div>`;
+    };
     let boxiSection;
     if (!boxi.length) {
       boxiSection = `<p class="page-sub">Pregled tvojih boxov in naročnine.</p>${emptyState("truck", "Še nimaš aktivnih boxov", "", '<button class="btn primary auto" id="newOrderEmpty" style="margin:16px auto 0">Novo naročilo</button>')}`;
     } else if (state.boxView === "skl") {
-      boxiSection = group("V skladišču", skl, "skl");
+      boxiSection = group("Skladiščenje", skl, "skl");
     } else if (state.boxView === "naj") {
       boxiSection = group("V najemu / izposoji", naj, "naj");
     } else {
@@ -385,6 +397,8 @@
         <div class="kv"><span class="k">Status</span><span class="v">${subBadge}</span></div>
         <div class="kv"><span class="k">Začetek</span><span class="v">${fmtDate(narocninaOd())}</span></div>
         <div class="kv"><span class="k">Poteče / obnova</span><span class="v">${fmtDate(narocninaDo())}</span></div>
+        <div class="kv"><span class="k">V skladišču</span><span class="v">${warehouseCount}</span></div>
+        <div class="kv"><span class="k">Pri vas</span><span class="v">${customerCount}</span></div>
         ${currentMonthly > 0 ? `<div class="kv"><span class="k">Cena za trenutno 30-dnevno obdobje</span><span class="v">${money(currentMonthly)}</span></div>` : ""}
         ${nextPrices.map((x) => `<div class="kv"><span class="k">Od ${fmtDate(x.sprememba_od)} (${x.naslednje_st_boxov} boxov)</span><span class="v">${money(x.naslednja_cena)} / 30 dni</span></div>`).join("")}
       </div>
@@ -457,8 +471,28 @@
     };
     $$(".box-check").forEach((c) => c.addEventListener("change", update));
     const selAllBoxes = $("#selAllBoxes");
+    $$("[data-box-filter]").forEach((button) => button.addEventListener("click", () => {
+      state.boxFilter = button.dataset.boxFilter;
+      $$("[data-box-filter]").forEach((b) => {
+        const active = b.dataset.boxFilter === state.boxFilter;
+        b.classList.toggle("active", active);
+        b.setAttribute("aria-pressed", String(active));
+      });
+      const rows = $$("#boxList [data-box-location]");
+      rows.forEach((row) => {
+        row.hidden = state.boxFilter !== "all" && row.dataset.boxLocation !== state.boxFilter;
+        // Ob spremembi filtra izbiro počistimo, da skriti boxi ne pridejo v prevoz.
+        const check = $(".box-check", row);
+        if (check) check.checked = false;
+      });
+      const visible = rows.filter((row) => !row.hidden);
+      $("#visibleBoxCount").textContent = visible.length;
+      $("#emptyBoxFilter").hidden = visible.length > 0;
+      if (selAllBoxes) selAllBoxes.hidden = !visible.some((row) => $(".box-check", row));
+      update();
+    }));
     if (selAllBoxes) selAllBoxes.addEventListener("click", () => {
-      const checks = $$(".box-check");
+      const checks = $$("#boxList [data-box-location]:not([hidden]) .box-check");
       const allChecked = checks.length > 0 && checks.every((c) => c.checked);
       checks.forEach((c) => { c.checked = !allChecked; });
       update();
