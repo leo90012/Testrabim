@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {returnBoxIds,creditNoteParams,validateCardRefund,processBoxRefund,handleBoxRefund} from './box-refunds.ts';
-const quote={order_id:1,stripe_invoice_id:'in_test',stripe_customer_id:'cus_test',amount_cents:2000,currency:'eur',is_test:true,box_count:1,unused_days:20,period_start:'2026-10-24',period_end:'2026-11-23'};
+const quote={kind:'initial_delivery',order_id:1,stripe_invoice_id:'in_test',stripe_customer_id:'cus_test',amount_cents:2000,currency:'eur',is_test:true,box_count:10,ordered_box_count:40,accepted_box_count:30,period_start:'2026-10-24',period_end:'2026-11-23'};
 function fixture(mode='stripe',failSave=false){
   const state:any={row:{id:'a2f6cf5f-e144-4a76-9ea4-4d731339a70b',order_id:1,status:'prepared',mode,amount_cents:2000,currency:'eur',details:quote,lease_token:null},notes:[],createCount:0,failSave,previewCount:0};
   const client:any={
@@ -27,7 +27,7 @@ Deno.test('Box IDs are distinct positive integers in canonical order',()=>{
   assert.deepEqual(returnBoxIds([3,1,2]),[1,2,3]);for(const bad of [[],[1,1],[null],[1.2],[-1],'1'])assert.throws(()=>returnBoxIds(bad));
 });
 Deno.test('Credit note refunds exact total, disables automatic mail and includes Slovene memo',()=>{
-  const p=creditNoteParams(quote,'op');assert.equal(p.amount,2000);assert.equal(p.refund_amount,2000);assert.equal(p.email_type,'none');assert.equal(p.metadata.rabimbox_box_refund,'op');assert.match(p.memo,/Sorazmerno vračilo/);
+  const p=creditNoteParams(quote,'op');assert.equal(p.amount,2000);assert.equal(p.refund_amount,2000);assert.equal(p.email_type,'none');assert.equal(p.metadata.rabimbox_box_refund,'op');assert.match(p.memo,/naročeno 40, prevzeto 30/);assert.doesNotMatch(p.memo,/dni|Sorazmerno/);
 });
 Deno.test('Foreign customer and live/test mismatch fail before credit note creation',async()=>{
   const f=fixture();await assert.rejects(()=>validateCardRefund({...quote,stripe_customer_id:'cus_other'},f.client,false),/ne pripada/);
@@ -47,11 +47,18 @@ Deno.test('Lost database response after Stripe success is recovered without anot
 Deno.test('Processing lease excludes concurrent payout',async()=>{
   const f=fixture();f.state.row.lease_token='busy';await assert.rejects(()=>processBoxRefund(f.sb,f.state.row,()=>f.client,false));assert.equal(f.state.createCount,0);
 });
+Deno.test('Old prorated pending refunds cannot be paid under the new policy',async()=>{
+  const f=fixture();f.state.row.details={...quote,kind:undefined,unused_days:20};
+  await assert.rejects(()=>processBoxRefund(f.sb,f.state.row,()=>f.client,false),/prvi dostavi/);assert.equal(f.state.createCount,0);
+});
 Deno.test('Manual and zero refunds never call Stripe',async()=>{
   for(const mode of ['manual','zero']){const f=fixture(mode);const result=await processBoxRefund(f.sb,f.state.row,()=>{throw new Error('Stripe must not be called')},false);assert.equal(result.status,mode==='manual'?'manual':'completed');}
 });
 Deno.test('Missing confirmation never prepares a return or pays money',async()=>{
   const f=fixture();await assert.rejects(()=>handleBoxRefund('box_refund',{order_id:1,box_ids:[1],expected_amount:2000},f.sb,()=>f.client,null,false),/Potrdite/);assert.equal(f.state.createCount,0);
+});
+Deno.test('Initial-delivery declaration is required before any payout lookup',async()=>{
+  const f=fixture();await assert.rejects(()=>handleBoxRefund('box_refund',{order_id:1,box_ids:[1],expected_amount:2000,confirmed:true},f.sb,()=>f.client,null,false),/neuporabljene odvečne boxe ob prvi dostavi/);assert.equal(f.state.createCount,0);
 });
 Deno.test('History refreshes an asynchronous Stripe refund without issuing another one',async()=>{
   const f=fixture();f.state.row.status='submitted';f.state.row.provider_status='pending';f.state.row.stripe_refund_id='re_test';

@@ -10,7 +10,7 @@ const id=(v:any):string|null=>typeof v==='string'?v:v?.id||null;
 async function checked(p:any):Promise<any>{const r=await p;if(r.error)throw r.error;return r.data;}
 export function creditNoteParams(q:any,operationId?:string){
   const params:any={invoice:q.stripe_invoice_id,amount:q.amount_cents,refund_amount:q.amount_cents,reason:'order_change',email_type:'none',
-    memo:`Sorazmerno vračilo za ${q.box_count} boxov: ${q.unused_days} neizkoriščenih dni 30-dnevnega obdobja ${q.period_start}–${q.period_end}.`};
+    memo:`Vračilo razlike med paketoma ob prvi dostavi: naročeno ${q.ordered_box_count}, prevzeto ${q.accepted_box_count} boxov. ${q.box_count} boxov ni bilo prevzetih.`};
   if(operationId)params.metadata={rabimbox_box_refund:operationId,rabimbox_order:String(q.order_id)};
   return params;
 }
@@ -34,6 +34,7 @@ async function existingCreditNote(client:any,row:any){
   throw new Error('Zgodovina Stripe dobropisov zahteva ročni pregled. Vračilo ni bilo ponovljeno.');
 }
 export async function processBoxRefund(sb:any,row:any,clientFor:(test:boolean)=>any,primaryLive:boolean){
+  if(row.status==='prepared'&&row.details?.kind!=='initial_delivery')throw new Error('Vračilo je dovoljeno samo za neprevzete boxe ob prvi dostavi.');
   const token=crypto.randomUUID();
   row=await checked(sb.rpc('rb_claim_box_refund',{p_id:row.id,p_token:token}));
   if(row.status!=='prepared')return row;
@@ -92,6 +93,7 @@ export async function handleBoxRefund(action:string,body:any,sb:any,clientFor:(t
   }
   if(action!=='box_refund')throw new Error('Neveljavno dejanje vračila.');
   if(body.confirmed!==true||!Number.isSafeInteger(body.expected_amount)||body.expected_amount<0)throw new Error('Potrdite predogled vračila.');
+  if(body.initial_delivery_confirmed!==true)throw new Error('Potrdite, da gre za neuporabljene odvečne boxe ob prvi dostavi.');
   const key=uuid(body.request_key);
   let row=await checked(sb.from('rb_box_refunds').select('*').eq('id',key).maybeSingle());
   if(row){
