@@ -449,21 +449,21 @@
     const update = () => {
       const sel = $$(".box-check:checked");
       if (!bar || !inner) return;
+      $("#view").classList.toggle("has-box-selection", sel.length > 0);
       if (!sel.length) { bar.classList.add("hidden"); inner.innerHTML = ""; return; }
       bar.classList.remove("hidden");
       const statuses = [...new Set(sel.map((c) => c.dataset.status))];
       const storages = [...new Set(sel.map((c) => c.dataset.storage))];
       const ids = sel.map((c) => Number(c.value));
       const msg = (t) => `<div class="deliver-msg">${t}</div>`;
-      const abtn = (a) => `<button class="btn primary act-btn" type="button" data-action="${a}">Naroči prevoz</button>`;
+      const abtn = (a, label = "Naroči prevoz", variant = "primary") => `<button class="btn ${variant} act-btn" type="button" data-action="${a}">${label}</button>`;
       let html;
       if (statuses.length > 1 || storages.length > 1) {
         html = msg("Izberi bokse v istem stanju in isti storitvi.");
       } else {
         const st = statuses[0], isSkl = storages[0] === "1";
-        if (isSkl && st === "pri_stranki") html = abtn("prevoz_skladisce");
+        if (st === "pri_stranki") html = abtn(isSkl ? "prevoz_skladisce" : "vracilo") + abtn("vracilo_zakljucek", "Naroči prevoz in zaključi naročilo", "outline-2");
         else if (isSkl && st === "v_skladiscu") html = abtn("dostava");
-        else if (!isSkl && st === "pri_stranki") html = abtn("vracilo");
         else html = msg("Ti boxi trenutno niso na voljo za naročilo (na zalogi / v transportu).");
       }
       inner.innerHTML = html;
@@ -647,12 +647,14 @@
     prevoz_skladisce: { label: "Prevoz v skladišče", title: "Naroči prevoz v skladišče", submit: "Naroči prevoz", addr: "Naslov prevzema" },
     dostava:          { label: "Dostava k stranki",  title: "Naroči dostavo k sebi",     submit: "Naroči dostavo", addr: "Naslov dostave" },
     vracilo:          { label: "Vračilo",            title: "Naroči vračilo boxov",      submit: "Naroči vračilo", addr: "Naslov prevzema" },
+    vracilo_zakljucek: { label: "Vračilo in zaključek naročila", title: "Prevoz in zaključek naročila", submit: "Naroči prevoz in zaključi naročilo", addr: "Naslov prevzema" },
   };
   async function newOrder(ids, action) {
     ids = Array.isArray(ids) ? ids : [];
     if (ids.some((id) => state._pendingTransport?.has(Number(id)))) { toast("Za izbrane boxe je prevoz že naročen. Počakaj na izvedbo ali preklic zahtevka."); return; }
     const a = REQ_ACTIONS[action] || REQ_ACTIONS.vracilo;
     openSheet(`<h3>${esc(a.title)}</h3><form id="orderForm">
+      ${action === "vracilo_zakljucek" ? '<p class="hint">Pošlji zahtevek za prevzem izbranih boxov in zaključek povezanega naročila. Naročilo bo po prevzemu ročno zaključil skladiščnik.</p>' : ""}
       <div class="field"><label>${esc(a.addr)}</label><input id="oAddr" placeholder="Ulica in hišna številka, kraj" value="${esc((state.kupec && state.kupec.naslov) || "")}" /></div>
       <div class="field"><label>Datum</label><input type="date" id="oDate" min="${minOrderDateISO()}" /><div class="hint">Najzgodnejši termin je čez 3 delovne dni, od ponedeljka do petka.</div></div>
       <div class="field"><label>Ura</label><select id="oTime"><option value="">Najprej izberi datum</option></select><div class="hint" id="oTimeHint"></div></div>
