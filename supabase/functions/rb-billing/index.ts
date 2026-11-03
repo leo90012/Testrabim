@@ -4,6 +4,7 @@ import {addDays,invoiceDescription,renewalPrice,text,csvCell,TERMS_VERSION} from
 import {sendLoggedMail,escapeHtml as esc} from "../_shared/mail.ts";
 import {ensureSlovenianDocuments} from "../_shared/stripe-language.ts";
 import {STRIPE_INVOICE_FOOTER} from "../_shared/invoice-issuer.ts";
+import {handleBoxRefund} from "../_shared/box-refunds.ts";
 const URL=Deno.env.get("SUPABASE_URL")||"",KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 const PANEL="https://test.rabimbox.si/moj-profil/";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization,apikey,x-client-info,content-type","Access-Control-Allow-Methods":"POST,OPTIONS"};
@@ -288,6 +289,7 @@ Deno.serve(async req=>{
       const session=await client.checkout.sessions.create({locale:"sl",mode:"setup",currency:"eur",customer,payment_method_types:["card"],metadata:{ref:o.stevilka,auto_renew:"30d",terms:TERMS_VERSION},success_url:PANEL+"?placilo=kartica&session_id={CHECKOUT_SESSION_ID}",cancel_url:PANEL});return json({url:session.url});
     }
     if(!admin&&!service)return json({error:"Samo administrator."},403);
+    if(["box_refund_preview","box_refund","box_refund_retry","box_refund_list"].includes(action))return json(await handleBoxRefund(action,body,sb,(test)=>stripe(test),user?.id||null,!/^[sr]k_test_/.test(Deno.env.get("STRIPE_SECRET_KEY")||"")));
     if(action==="test_setup")return json(await testSetup());
     if(action==="test_control")return json(await testControl(body));
     if(action==="health")return json({ok:true,mode:/^[sr]k_test_/.test(Deno.env.get("STRIPE_SECRET_KEY")||"")?"test":"live",test_key:!!Deno.env.get("STRIPE_TEST_SECRET_KEY"),webhook:!!Deno.env.get("STRIPE_WEBHOOK_SECRET"),period_days:30});
