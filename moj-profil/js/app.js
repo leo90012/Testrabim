@@ -360,9 +360,11 @@
     const currentMonthly = activeSubs.reduce((sum, x) => sum + Number(x.cena_mesecna || 0), 0);
     const nextPrices = activeSubs.filter((x) => x.sprememba_od && x.naslednja_cena != null);
     const skl = boxi.filter(isStorage), naj = boxi.filter((b) => !isStorage(b));
-    if (!state.boxView || (state.boxView === "naj" && !naj.length) || (state.boxView === "skl" && !skl.length)) {
-      state.boxView = naj.length ? "naj" : skl.length ? "skl" : null;
+    if (!["naj", "skl"].includes(state.boxView)) {
+      state.boxView = naj.length ? "naj" : skl.length ? "skl" : "naj";
     }
+    const selectedBoxes = state.boxView === "skl" ? skl : naj;
+    const newOrderLink = `<a class="btn primary auto" id="newOrderDashboard" href="../narocilo/?tip=${state.boxView === "skl" ? "skladiscenje" : "izposoja"}">Novo naročilo</a>`;
     const aktivna = narocila.filter((z) => { const s = (z.status || "").toLowerCase(); return !s.includes("zakljuc") && !s.includes("zaključ") && !s.includes("preklic") && !s.includes("dostavlj"); }).length;
     const rowH = (b) => {
       const reserved = String(b.status || "").toLowerCase() === "rezervirana";
@@ -381,8 +383,8 @@
         <div class="card" id="boxList" data-group="${gkey}">${arr.map(rowH).join("")}<p class="muted" id="emptyBoxFilter" role="status"${visible.length ? " hidden" : ""}>Za izbrano lokacijo ni boxov.</p></div>`;
     };
     let boxiSection;
-    if (!boxi.length) {
-      boxiSection = `<p class="page-sub">Pregled tvojih boxov in naročnine.</p>${emptyState("truck", "Še nimaš aktivnih boxov", "", '<button class="btn primary auto" id="newOrderEmpty" style="margin:16px auto 0">Novo naročilo</button>')}`;
+    if (!selectedBoxes.length) {
+      boxiSection = emptyState("truck", state.boxView === "skl" ? "Še nimaš boxov za skladiščenje" : "Še nimaš boxov za izposojo", "", `<div style="margin-top:16px">${newOrderLink}</div>`);
     } else if (state.boxView === "skl") {
       boxiSection = group("Skladiščenje", skl, "skl");
     } else if (state.boxView === "naj") {
@@ -390,8 +392,9 @@
     } else {
       boxiSection = "";
     }
-    const choiceCards = `<div class="nadzor-choice"><div class="nchoice${state.boxView === "naj" ? " active" : ""}" data-view="naj"><span class="cnt">${naj.length}</span><span class="t">Izposoja</span><span class="d">Boxi v najemu</span></div><div class="nchoice${state.boxView === "skl" ? " active" : ""}" data-view="skl"><span class="cnt">${skl.length}</span><span class="t">Skladiščenje</span><span class="d">Boxi v skladišču</span></div></div>`;
+    const choiceCards = `<div class="nadzor-choice"><button type="button" class="nchoice${state.boxView === "naj" ? " active" : ""}" data-view="naj" aria-pressed="${state.boxView === "naj"}"><span class="cnt">${naj.length}</span><span class="t">Izposoja</span><span class="d">Boxi v najemu</span></button><button type="button" class="nchoice${state.boxView === "skl" ? " active" : ""}" data-view="skl" aria-pressed="${state.boxView === "skl"}"><span class="cnt">${skl.length}</span><span class="t">Skladiščenje</span><span class="d">Boxi v skladišču</span></button></div>`;
     return `${pageHead("nadzor")}
+      ${selectedBoxes.length ? `<div style="margin-bottom:16px">${newOrderLink}</div>` : ""}
       ${choiceCards}
       <div class="card"><h3>Naročnina</h3>
         <div class="kv"><span class="k">Status</span><span class="v">${subBadge}</span></div>
@@ -435,8 +438,7 @@
     }catch(e){const box=$("#rbBillingError");if(box)box.textContent=e.message||String(e);else toast(e.message||String(e));button.disabled=false;}
   }
   function wireNadzor() {
-    const bar = $("#deliverBar"), inner = bar ? $(".inner", bar) : null, empty = $("#newOrderEmpty");
-    if (empty) empty.addEventListener("click", () => { window.location.href = "../narocilo/"; });
+    const bar = $("#deliverBar"), inner = bar ? $(".inner", bar) : null;
     $$(".nchoice[data-view]").forEach((c) => c.addEventListener("click", () => {
       const v = c.getAttribute("data-view");
       state.boxView = v;
@@ -462,7 +464,7 @@
         html = msg("Izberi bokse v istem stanju in isti storitvi.");
       } else {
         const st = statuses[0], isSkl = storages[0] === "1";
-        if (st === "pri_stranki") html = abtn(isSkl ? "prevoz_skladisce" : "vracilo") + abtn("vracilo_zakljucek", "Naroči prevoz in zaključi naročilo", "outline-2");
+        if (st === "pri_stranki") html = (isSkl ? abtn("prevoz_skladisce") : "") + abtn("vracilo_zakljucek", "Naroči prevoz in zaključi naročilo", isSkl ? "outline-2" : "primary");
         else if (isSkl && st === "v_skladiscu") html = abtn("dostava");
         else html = msg("Ti boxi trenutno niso na voljo za naročilo (na zalogi / v transportu).");
       }
@@ -654,7 +656,6 @@
     if (ids.some((id) => state._pendingTransport?.has(Number(id)))) { toast("Za izbrane boxe je prevoz že naročen. Počakaj na izvedbo ali preklic zahtevka."); return; }
     const a = REQ_ACTIONS[action] || REQ_ACTIONS.vracilo;
     openSheet(`<h3>${esc(a.title)}</h3><form id="orderForm">
-      ${action === "vracilo_zakljucek" ? '<p class="hint">Pošlji zahtevek za prevzem izbranih boxov in zaključek povezanega naročila. Naročilo bo po prevzemu ročno zaključil skladiščnik.</p>' : ""}
       <div class="field"><label>${esc(a.addr)}</label><input id="oAddr" placeholder="Ulica in hišna številka, kraj" value="${esc((state.kupec && state.kupec.naslov) || "")}" /></div>
       <div class="field"><label>Datum</label><input type="date" id="oDate" min="${minOrderDateISO()}" /><div class="hint">Najzgodnejši termin je čez 3 delovne dni, od ponedeljka do petka.</div></div>
       <div class="field"><label>Ura</label><select id="oTime"><option value="">Najprej izberi datum</option></select><div class="hint" id="oTimeHint"></div></div>
