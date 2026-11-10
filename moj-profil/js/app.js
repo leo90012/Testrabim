@@ -554,20 +554,16 @@
     state.narocnine = narocnineRes.data || [];
     state._orders = orders;
     const grouped = new Map(orders.map((o) => [Number(o.id), []]));
-    const legacy = [];
     zahteve.forEach((z) => {
       const bucket = grouped.get(Number(z.narocilo_id));
-      if (bucket) bucket.push(z); else legacy.push(z);
+      if (bucket) bucket.push(z);
     });
-    const narocilaCard = orders.length ? `<div class="section-title">Moja naročila</div>${orders.map((o) => {
-      const related = grouped.get(Number(o.id)) || [];
-      return `<div class="card" style="margin-bottom:14px">${narociloRow(o)}${billingOverview([o])}${related.length ? `<div style="padding:0 16px 12px 54px"><div class="s" style="font-weight:700;margin:8px 0">Zahteve za prevoz (${related.length})</div>${related.map(orderRow).join("")}</div>` : ""}</div>`;
-    }).join("")}` : "";
-    const zahteveCard = legacy.length ? `<div class="section-title">Stare zahteve brez povezave z naročilom</div><div class="card">${legacy.map(orderRow).join("")}</div>` : "";
-    const prazno = (!orders.length && !zahteve.length) ? emptyState("truck", "Še nimaš oddanih naročil", "Ko oddaš naročilo, se bo skupaj s statusom plačila prikazalo tukaj.") : "";
+    state._orderRequests = grouped;
+    const narocilaCard = orders.length ? `<div class="section-title">Moja naročila</div>${orders.map((o) => `<div class="card" style="margin-bottom:14px">${narociloRow(o)}${billingOverview([o])}</div>`).join("")}` : "";
+    const prazno = !orders.length ? emptyState("truck", "Še nimaš oddanih naročil", "Ko oddaš naročilo, se bo skupaj s statusom plačila prikazalo tukaj.") : "";
     return `${pageHead("narocila")}<p class="page-sub">Pregled tvojih naročil ter zahtev za dostavo, prevzem in vrnitev boxov.</p>
       <button class="btn primary auto" id="newOrderBtn" style="margin-bottom:16px">Novo naročilo</button>
-      ${narocilaCard}${zahteveCard}${prazno}`;
+      ${narocilaCard}${prazno}`;
   }
   function narociloRow(o) {
     const paid = o.placano === true;
@@ -583,11 +579,13 @@
     const paid = o.placano === true;
     const termin = o.datum_dostave ? (fmtDate(o.datum_dostave) + (o.cas_dostave ? " " + o.cas_dostave : "")) : "-";
     const rowKV = (k, v) => (v && v !== "-") ? `<div class="kv"><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span></div>` : "";
+    const related = state._orderRequests?.get(Number(o.id)) || [];
     openSheet(`<h3>Naročilo ${esc(o.stevilka || ("#" + o.id))}</h3>
       <div class="kv"><span class="k">Način naročila</span><span class="v">${o.is_test?'<span class="badge amber">TEST</span>':o.vir==="rocno"?'<span class="badge amber">Ročni vnos</span>':'<span class="badge green">Spletno naročilo</span>'}</span></div>
       ${billing?rowKV("Obdobje",fmtDate(billing.datum_od)+" – "+fmtDate(addDays(billing.datum_do,-1))):""}
       ${rowKV("Storitev", o.tip)}${rowKV("Paket", o.paket)}${rowKV("Cena", o.cena_opis)}${rowKV("Termin", termin)}
       ${rowKV("Naslov", o.naslov)}${rowKV("Poštna", o.postna_stevilka)}${rowKV("Mesto", o.mesto)}${rowKV("Telefon", o.telefon)}
+      <section class="mt" id="orderTransportRequests"><h4>Zahteve za prevoz (${related.length})</h4>${related.length ? related.map(orderRow).join("") : '<p class="muted">Za to naročilo še ni zahtev za prevoz.</p>'}</section>
       <div class="rowflex mt"><button class="btn outline-2" type="button" data-close>Zapri</button></div>`);
   }
   function wireNarocila() {
