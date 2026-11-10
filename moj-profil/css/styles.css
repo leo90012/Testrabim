@@ -246,6 +246,11 @@ svg { display: block; }
 .rowflex { display: flex; gap: 12px; }
 .rowflex > * { flex: 1; }
 
+.transport-area { border:0; padding:0; margin:0 0 18px; }
+.transport-area legend { font-size:13px; font-weight:500; margin-bottom:8px; }
+.transport-area label { display:flex; align-items:center; gap:8px; margin:10px 0; }
+.transport-area input { width:18px; height:18px; accent-color:var(--brand); }
+.transport-notice { padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2); line-height:1.6; }
 .nadzor-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0 0 18px; }
 @media (max-width: 560px) { .nadzor-choice { grid-template-columns: 1fr; } }
 .nadzor-choice .nchoice { display: block; background: #fff; border: 1px solid var(--line, #e5e8ee); border-radius: 12px; box-shadow: 0 1px 3px rgba(16,24,40,.07); padding: 20px; text-align: center; text-decoration: none; transition: border-color .15s, box-shadow .15s, transform .1s; }

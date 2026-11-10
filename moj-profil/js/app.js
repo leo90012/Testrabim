@@ -352,18 +352,21 @@
         (status === "rezervirana" && reservedSubs.has(Number(b.narocnina_id)));
     });
     state._boxes = boxi;
-    const warehouseCount = boxi.filter((b) => boxLocation(b) === "v_skladiscu").length;
-    const customerCount = boxi.filter((b) => boxLocation(b) === "pri_stranki").length;
-    const subStarted = (state.narocnine || []).some((x) => x.datum_od && String(x.status || "").toLowerCase() === "aktivna");
-    const subBadge = subStarted ? subStatusBadge("aktivna") : (ordersAll.length ? subStatusBadge("v dostavi") : subStatusBadge(k.status_narocnine));
-    const activeSubs = (state.narocnine || []).filter((x) => x.status === "aktivna");
-    const currentMonthly = activeSubs.reduce((sum, x) => sum + Number(x.cena_mesecna || 0), 0);
-    const nextPrices = activeSubs.filter((x) => x.sprememba_od && x.naslednja_cena != null);
     const skl = boxi.filter(isStorage), naj = boxi.filter((b) => !isStorage(b));
     if (!["naj", "skl"].includes(state.boxView)) {
       state.boxView = naj.length ? "naj" : skl.length ? "skl" : "naj";
     }
     const selectedBoxes = state.boxView === "skl" ? skl : naj;
+    const storageView = state.boxView === "skl";
+    const serviceSubs = (state.narocnine || []).filter((n) => isStorage({tip_storitve:n.tip}) === storageView);
+    const activeSubs = serviceSubs.filter((n) => n.status === "aktivna");
+    const serviceOrders = ordersAll.filter((o) => isStorage({tip_storitve:o.tip}) === storageView && !["zakljuceno","preklicano"].includes(o.status));
+    const subBadge = activeSubs.length ? subStatusBadge("aktivna") : serviceOrders.length ? subStatusBadge("v dostavi") : subStatusBadge("neaktivna");
+    const starts = activeSubs.map((n) => n.datum_od).filter(Boolean).sort();
+    const ends = activeSubs.map((n) => n.datum_do || addDays(n.datum_od,30)).filter(Boolean).sort();
+    const warehouseCount = selectedBoxes.filter((b) => boxLocation(b) === "v_skladiscu").length;
+    const customerCount = selectedBoxes.filter((b) => boxLocation(b) === "pri_stranki").length;
+    const currentMonthly = activeSubs.reduce((sum, n) => sum + Number(n.cena_mesecna || 0), 0);
     const newOrderLink = `<a class="btn primary auto" id="newOrderDashboard" href="../narocilo/?tip=${state.boxView === "skl" ? "skladiscenje" : "izposoja"}">Novo naročilo</a>`;
     const aktivna = narocila.filter((z) => { const s = (z.status || "").toLowerCase(); return !s.includes("zakljuc") && !s.includes("zaključ") && !s.includes("preklic") && !s.includes("dostavlj"); }).length;
     const rowH = (b) => {
@@ -396,14 +399,18 @@
     return `${pageHead("nadzor")}
       ${selectedBoxes.length ? `<div style="margin-bottom:16px">${newOrderLink}</div>` : ""}
       ${choiceCards}
-      <div class="card"><h3>Naročnina</h3>
+      <div class="card" id="serviceSubscription"><h3>Naročnina – ${storageView ? "skladiščenje" : "izposoja"}</h3>
         <div class="kv"><span class="k">Status</span><span class="v">${subBadge}</span></div>
-        <div class="kv"><span class="k">Začetek</span><span class="v">${fmtDate(narocninaOd())}</span></div>
-        <div class="kv"><span class="k">Poteče / obnova</span><span class="v">${fmtDate(narocninaDo())}</span></div>
+        <div class="kv"><span class="k">Začetek</span><span class="v">${fmtDate(starts[0])}</span></div>
+        <div class="kv"><span class="k">Poteče / obnova</span><span class="v">${fmtDate(ends[ends.length-1])}</span></div>
         <div class="kv"><span class="k">V skladišču</span><span class="v">${warehouseCount}</span></div>
         <div class="kv"><span class="k">Pri vas</span><span class="v">${customerCount}</span></div>
         ${currentMonthly > 0 ? `<div class="kv"><span class="k">Cena za trenutno 30-dnevno obdobje</span><span class="v">${money(currentMonthly)}</span></div>` : ""}
-        ${nextPrices.map((x) => `<div class="kv"><span class="k">Od ${fmtDate(x.sprememba_od)} (${x.naslednje_st_boxov} boxov)</span><span class="v">${money(x.naslednja_cena)} / 30 dni</span></div>`).join("")}
+        ${activeSubs.filter((n) => n.datum_do).map((n) => {
+          const order = ordersAll.find((o) => Number(o.id) === Number(n.narocilo_id));
+          const ref = activeSubs.length > 1 ? `${esc(order?.stevilka || ("#"+n.narocilo_id))} · ` : "";
+          return `<div class="kv renewal-line"><span class="k">${ref}Od ${fmtDate(n.datum_do)} (${n.naslednje_st_boxov ?? n.st_boxov} boxov)</span><span class="v">${money(n.naslednja_cena ?? n.cena_mesecna)} / 30 dni</span></div>`;
+        }).join("")}
       </div>
       ${boxiSection}
       <div class="deliver-bar hidden" id="deliverBar"><div class="inner"></div></div>`;
@@ -651,19 +658,32 @@
     vracilo:          { label: "Vračilo",            title: "Naroči vračilo boxov",      submit: "Naroči vračilo", addr: "Naslov prevzema" },
     vracilo_zakljucek: { label: "Vračilo in zaključek naročila", title: "Prevoz in zaključek naročila", submit: "Naroči prevoz in zaključi naročilo", addr: "Naslov prevzema" },
   };
+  const TRANSPORT_AREA_NOTICE = 'Naročilo prevzemov preko spleta je možno samo po Ljubljani in okolici. Za naročila v ostalo Slovenijo in tujino nas kontaktirajte na 040 796 040 ali pošljite na email: info@rabimbox.si';
   async function newOrder(ids, action) {
     ids = Array.isArray(ids) ? ids : [];
     if (ids.some((id) => state._pendingTransport?.has(Number(id)))) { toast("Za izbrane boxe je prevoz že naročen. Počakaj na izvedbo ali preklic zahtevka."); return; }
     const a = REQ_ACTIONS[action] || REQ_ACTIONS.vracilo;
     openSheet(`<h3>${esc(a.title)}</h3><form id="orderForm">
-      <div class="field"><label>${esc(a.addr)}</label><input id="oAddr" placeholder="Ulica in hišna številka, kraj" value="${esc((state.kupec && state.kupec.naslov) || "")}" /></div>
+      <div class="field"><label for="oAddr">${esc(a.addr)}</label><input id="oAddr" maxlength="400" placeholder="Ulica in hišna številka" value="${esc((state.kupec && state.kupec.naslov) || "")}" /></div>
+      <fieldset class="transport-area"><legend>${action === "dostava" ? "Kraj dostave" : "Kraj prevzema"}</legend>${[["ljubljana","Ljubljana in okolica"],["slovenija","Ostala Slovenija"],["tujina","Tujina"]].map(([value,label]) => `<label><input type="checkbox" class="transport-area-choice" name="transportArea" value="${value}" /> ${label}</label>`).join("")}</fieldset>
+      <p id="oAreaNotice" class="transport-notice" role="status" hidden>Naročilo prevzemov preko spleta je možno samo po Ljubljani in okolici. Za naročila v ostalo Slovenijo in tujino nas kontaktirajte na <a href="tel:+38640796040">040 796 040</a> ali pošljite na email: <a href="mailto:info@rabimbox.si">info@rabimbox.si</a></p>
+      <div id="oLocalFields" hidden>
+      <div class="field"><label for="oPlace">Kraj</label><input id="oPlace" maxlength="100" placeholder="Vpiši kraj" value="${esc(state.kupec?.kraj || state.kupec?.mesto || "")}" /></div>
       <div class="field"><label>Datum</label><input type="date" id="oDate" min="${minOrderDateISO()}" /><div class="hint">Najzgodnejši termin je čez 3 delovne dni, od ponedeljka do petka.</div></div>
       <div class="field"><label>Ura</label><select id="oTime"><option value="">Najprej izberi datum</option></select><div class="hint" id="oTimeHint"></div></div>
       <div class="field"><label>Opomba</label><textarea id="oNote" rows="3" placeholder="Posebnosti, ..."></textarea></div>
+      </div>
       ${ids.length ? `<div class="hint" style="margin:-6px 0 12px">Izbrani boxi: ${ids.map((i) => esc((((state._boxes || []).find((b) => Number(b.id) === Number(i)) || {}).barkoda) || ("#" + i))).join(", ")}</div>` : ""}
-      <button class="btn primary" type="submit" id="oSubmit">${esc(a.submit)}</button>
+      <button class="btn primary" type="submit" id="oSubmit" disabled>${esc(a.submit)}</button>
       <button class="btn ghost mt" type="button" data-close>Prekliči</button></form>`);
     const form = $("#orderForm"); form.dataset.action = action || "vracilo"; form.dataset.ids = JSON.stringify(ids);
+    $$(".transport-area-choice",form).forEach((choice) => choice.addEventListener("change", () => {
+      const area = choice.checked ? choice.value : "";
+      $$(".transport-area-choice",form).forEach((other) => { other.checked = other.value === area; });
+      $("#oAreaNotice").hidden = !area || area === "ljubljana";
+      $("#oLocalFields").hidden = area !== "ljubljana";
+      $("#oSubmit").disabled = area !== "ljubljana";
+    }));
     const de = $("#oDate");
     if (de) {
       if (window.flatpickr) {
@@ -687,8 +707,10 @@
     const ids = (() => { try { return JSON.parse(form.dataset.ids || "[]"); } catch { return []; } })();
     const a = REQ_ACTIONS[action] || REQ_ACTIONS.vracilo;
     const btn = $("#oSubmit");
+    const area = $(".transport-area-choice:checked",form)?.value || "", place = $("#oPlace").value.trim();
+    if (area !== "ljubljana") { alert(area ? TRANSPORT_AREA_NOTICE : "Izberi kraj prevzema oziroma dostave."); return; }
     const addr = $("#oAddr").value.trim(), date = $("#oDate").value || null, time = $("#oTime").value, note = $("#oNote").value.trim();
-    if (!addr || !date || !time) { alert("Prosim vpiši naslov, datum in uro."); return; }
+    if (!addr || !place || !date || !time) { alert("Prosim vpiši naslov, kraj, datum in uro."); return; }
     if (date < minOrderDateISO() || isWeekend(date)) { alert("Termin mora biti vsaj 3 delovne dni vnaprej in med ponedeljkom ter petkom."); return; }
     try { if ((await orderBlocked(date))[parseInt(time, 10)]) { alert("Izbrani termin je že zaseden. Izberi drugega."); await loadOrderTimes(); return; } }
     catch (err) { alert("Razpoložljivosti termina trenutno ni mogoče preveriti. Poskusi znova."); return; }
@@ -696,7 +718,7 @@
     try {
       const { data: created, error } = await state.sb.rpc("rb_create_transport_requests", {
         p_box_ids: ids, p_action: action, p_date: date, p_time: time,
-        p_address: addr, p_note: note,
+        p_address: addr, p_note: note, p_area: area, p_place: place,
       });
       if (error) throw error;
       closeSheet(); toast((created || []).length === 1 ? "Zahteva oddana" : `Oddanih je ${(created || []).length} zahtev`); state.tab = "narocila"; renderTab();

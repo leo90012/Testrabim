@@ -7,6 +7,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {sendLoggedMail} from "../_shared/mail.ts";
+import {creditNoteContent,validateCreditNoteAttachments,creditNoteRequestKey} from "../_shared/credit-note-email.ts";
 import {deliveryContractContent,validateContractAttachments,deliveryRequestKey} from "../_shared/delivery-contract.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
@@ -89,7 +90,8 @@ Deno.serve(async (req) => {
     const tip = String(body.tip || "");
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
     // Oblikovan dostavni mail ostane ročen: osebje doda sken in klikne Pošlji.
-    if(tip==="dostava_osnutek"||tip==="dostava_pogodba"){
+    if(["dostava_osnutek","dostava_pogodba","dobropis_osnutek","dobropis_poslji"].includes(tip)){
+      const credit=tip.startsWith("dobropis_");
       if(!isService(req)){
         const token=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
         const auth=await sb.auth.getUser(token);
@@ -98,13 +100,15 @@ Deno.serve(async (req) => {
       }
       const id=Number(body.narocilo_id);
       if(!Number.isSafeInteger(id)||id<1)throw new Error("Neveljavno naročilo.");
-      const {data:order,error}=await sb.from("narocila").select("id,stevilka,ime,email,status,st_boxov,st_boxov_dejansko,is_test").eq("id",id).single();
-      if(error||!order||!["pri_stranki","v_skladiscu","zakljuceno"].includes(order.status))throw new Error("Najprej potrdi dejansko dostavo boxov.");
+      const {data:order,error}=await sb.from("narocila").select("id,stevilka,ime,email,status,st_boxov,st_boxov_dejansko,is_test,placano,vir").eq("id",id).single();
+      if(error||!order)throw new Error("Naročilo ne obstaja.");
+      if(!credit&&!["pri_stranki","v_skladiscu","zakljuceno"].includes(order.status))throw new Error("Najprej potrdi dejansko dostavo boxov.");
+      if(credit&&order.placano!==true&&order.vir!=="rocno")throw new Error("Dobropis je mogoče poslati za plačano ali ročno vneseno naročilo.");
       if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(order.email||"")))throw new Error("Naročilo nima veljavnega e-naslova stranke.");
-      const draft=deliveryContractContent(order),html=ovoj(draft.title,draft.body);
-      if(tip==="dostava_osnutek")return new Response(JSON.stringify({ok:true,to:draft.to,subject:draft.subject,html}),{headers:{...cors,"Content-Type":"application/json"}});
+      const draft=credit?creditNoteContent(order):deliveryContractContent(order),html=ovoj(draft.title,draft.body);
+      if(tip.endsWith("_osnutek"))return new Response(JSON.stringify({ok:true,to:draft.to,subject:draft.subject,html}),{headers:{...cors,"Content-Type":"application/json"}});
       if(body.send_confirmed!==true)throw new Error("Potrdi ročno pošiljanje sporočila.");
-      const attachments=validateContractAttachments(body.attachments),key=deliveryRequestKey(order.id,body.request_id);
+      const attachments=credit?validateCreditNoteAttachments(body.attachments):validateContractAttachments(body.attachments),key=credit?creditNoteRequestKey(order.id,body.request_id):deliveryRequestKey(order.id,body.request_id);
       const result=await sendLoggedMail(draft.to,draft.subject,html,attachments,"info@rabimbox.si",{key,orderId:order.id,test:order.is_test});
       return new Response(JSON.stringify({ok:true,skipped:!!result.skipped}),{headers:{...cors,"Content-Type":"application/json"}});
     }
