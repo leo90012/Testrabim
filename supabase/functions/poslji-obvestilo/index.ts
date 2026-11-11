@@ -82,6 +82,78 @@ async function releaseEmail(sb: any, tip: string, vir: string, virId: number, da
   await sb.from("email_obvestila").delete().match({ tip, vir, vir_id: virId, datum });
 }
 
+const STAFF_EMAIL = "info@rabimbox.si";
+const STAFF_ORDER_FIELDS = "id,stevilka,vir,placano,is_test";
+
+async function sendStaffAlert(sb: any, key: string, title: string, reference: string, rows: string, orderId?: number) {
+  const subject = `${title} ${reference} – Rabimbox`.replace(/[\r\n]+/g, " ");
+  const html = ovoj(title, `<table style="width:100%;border-collapse:collapse">${rows}</table>${btn(WAREHOUSE_URL, "Odpri skladiščni panel")}`);
+  const result = await sendLoggedMail(STAFF_EMAIL, subject, html, [], STAFF_EMAIL, { key, orderId });
+  if (!result.skipped) return true;
+  const { data, error } = await sb.from("rb_email_log").select("status").eq("dedup_key", key).maybeSingle();
+  if (error) throw error;
+  return data?.status === "poslano";
+}
+
+async function sendStaffOrder(sb: any, order: any) {
+  if (!order || order.is_test || (order.placano !== true && order.vir !== "rocno")) return true;
+  const { data: previous, error } = await sb.from("email_obvestila").select("vir_id")
+    .match({ tip: "lastnik_narocilo", vir: "narocilo", vir_id: order.id, datum: "2000-01-01" }).maybeSingle();
+  if (error) throw error;
+  if (previous) return true;
+  const ref = order.stevilka || `#${order.id}`;
+  return await sendStaffAlert(sb, `lastnik-narocilo-${order.id}`, "Novo naročilo", ref,
+    vrstica("Naročilo", ref) + vrstica("Vir", order.vir === "rocno" ? "Ročni vnos" : "Spletno naročilo"), order.id);
+}
+
+async function sendStaffRequest(sb: any, id: number) {
+  const { data: request, error } = await sb.from("zahteve_dostave").select("id,narocilo_id").eq("id", id).maybeSingle();
+  if (error) throw error;
+  if (!request) return true;
+  let rows = vrstica("Zahtevek", `#${id}`);
+  if (request.narocilo_id) {
+    const { data: order, error: orderError } = await sb.from("narocila").select("stevilka,is_test").eq("id", request.narocilo_id).maybeSingle();
+    if (orderError) throw orderError;
+    if (order?.is_test) return true;
+    if (order) rows += vrstica("Naročilo", order.stevilka || `#${request.narocilo_id}`);
+  }
+  return await sendStaffAlert(sb, `lastnik-zahtevek-${id}`, "Nov zahtevek za prevoz", `#${id}`, rows, request.narocilo_id || undefined);
+}
+
+async function sendStaffNotifications(sb: any) {
+  const queue = "rb_staff_notification_queue";
+  const { data: due, error } = await sb.from(queue).select("kind,source_id,attempts,next_attempt_at")
+    .is("processed_at", null).lte("next_attempt_at", new Date().toISOString()).order("next_attempt_at").limit(20);
+  if (error) throw error;
+  let processed = 0;
+  for (const event of due || []) {
+    const key = { kind: event.kind, source_id: event.source_id };
+    const retryDelay = Math.min(60, 2 ** Math.min(event.attempts + 1, 6)) * 60_000;
+    const { data: claimed, error: claimError } = await sb.from(queue)
+      .update({ attempts: event.attempts + 1, next_attempt_at: new Date(Date.now() + retryDelay).toISOString() })
+      .match(key).is("processed_at", null).eq("next_attempt_at", event.next_attempt_at).select("source_id").maybeSingle();
+    if (claimError) throw claimError;
+    if (!claimed) continue;
+    try {
+      let delivered: boolean;
+      if (event.kind === "narocilo") {
+        const { data: order, error: orderError } = await sb.from("narocila").select(STAFF_ORDER_FIELDS).eq("id", event.source_id).maybeSingle();
+        if (orderError) throw orderError;
+        delivered = await sendStaffOrder(sb, order);
+      } else {
+        delivered = await sendStaffRequest(sb, event.source_id);
+      }
+      if (!delivered) continue;
+      const { error: doneError } = await sb.from(queue).update({ processed_at: new Date().toISOString() }).match(key);
+      if (doneError) throw doneError;
+      processed++;
+    } catch (err) {
+      console.error("Obvestilo skladišču", event.kind, event.source_id, err);
+    }
+  }
+  return { ok: true, processed };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
@@ -89,6 +161,10 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const tip = String(body.tip || "");
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
+    if (tip === "lastnik_batch") {
+      if (!isService(req)) return new Response(JSON.stringify({ error: "Ni dovoljeno." }), { status: 403, headers: { ...cors, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify(await sendStaffNotifications(sb)), { headers: { ...cors, "Content-Type": "application/json" } });
+    }
     // Oblikovan dostavni mail ostane ročen: osebje doda sken in klikne Pošlji.
     if(["dostava_osnutek","dostava_pogodba","dobropis_osnutek","dobropis_poslji"].includes(tip)){
       const credit=tip.startsWith("dobropis_");
@@ -186,33 +262,11 @@ Deno.serve(async (req) => {
       if (!isService(req)) throw new Error("Ni dovoljeno.");
       const ref = body.ref;
       if (!ref) throw new Error("Manjka ref.");
-      const { data: o } = await sb.from("narocila").select("*").eq("stevilka", ref).order("id", { ascending: false }).limit(1).maybeSingle();
+      const { data: o, error } = await sb.from("narocila").select(STAFF_ORDER_FIELDS).eq("stevilka", ref).order("id", { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
       if (!o || o.placano !== true) throw new Error("Plačano naročilo ni najdeno.");
-      const dan = "2000-01-01";
-      if (!(await claimEmail(sb, "lastnik_narocilo", "narocilo", o.id, dan))) {
-        return new Response(JSON.stringify({ ok: true, preskoceno: "že poslano" }), { headers: { ...cors, "Content-Type": "application/json" } });
-      }
-      try {
-      const tabela = `<table style="width:100%;border-collapse:collapse;margin-top:6px">
-        ${vrstica("Številka", o.stevilka || ("#" + o.id))}
-        ${vrstica("Storitev", String(o.tip || "").toLowerCase().includes("izpos") ? "Izposoja" : "Skladiščenje")}
-        ${vrstica("Paket", o.paket || "-")}
-        ${o.cena_opis ? vrstica("Cena", o.cena_opis) : ""}
-        ${vrstica("Kupec", [o.ime, o.priimek].filter(Boolean).join(" ") || "-")}
-        ${o.email ? vrstica("E-pošta", o.email) : ""}
-        ${o.telefon ? vrstica("Telefon", o.telefon) : ""}
-        ${o.datum_dostave ? vrstica("Termin", fmtDate(o.datum_dostave) + (o.cas_dostave ? " ob " + o.cas_dostave : "")) : ""}
-        ${o.naslov ? vrstica("Naslov", o.naslov + (o.mesto ? ", " + o.mesto : "")) : ""}
-        ${o.opis_lokacije ? vrstica("Objekt", o.opis_lokacije) : ""}
-        ${vrstica("Plačano", o.placano === true ? "Da" : "Ne")}
-      </table>`;
-      const telo = `<p style="font-size:14px;margin:0 0 4px">Novo naročilo na spletni strani:</p>${tabela}${btn(WAREHOUSE_URL, "Odpri panel")}`;
-      await posljiEmail(OWNER_EMAIL, `Novo naročilo ${o.stevilka || ""} – Rabimbox`, ovoj("Novo naročilo", telo));
+      await sendStaffOrder(sb, o);
       return new Response(JSON.stringify({ ok: true, sent: "lastnik_narocilo" }), { headers: { ...cors, "Content-Type": "application/json" } });
-      } catch (mailError) {
-        await releaseEmail(sb, "lastnik_narocilo", "narocilo", o.id, dan);
-        throw mailError;
-      }
     }
 
     // Obvestilo LASTNIKU o povpraševanju (fiksni naslov)
