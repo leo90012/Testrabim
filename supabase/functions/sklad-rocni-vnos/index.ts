@@ -1,6 +1,6 @@
 // Rocni profil in narocilo. Klice ga lahko samo prijavljeno osebje.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import {text,email as validEmail,validDate} from "../_shared/billing-rules.ts";
+import {text,email as validEmail,deliveryRules,validateDelivery} from "../_shared/billing-rules.ts";
 import {sendLoggedMail} from "../_shared/mail.ts";
 const URL=Deno.env.get("SUPABASE_URL")||"";
 const KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
@@ -17,6 +17,8 @@ Deno.serve(async(req)=>{
     const staff=await sb.from("osebje").select("vloga").eq("user_id",auth.data.user.id).maybeSingle();
     if(staff.error||!staff.data) return json({error:"Samo osebje lahko ustvari ročni vnos."},403);
     const input=await req.json().catch(()=>({}));
+    const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Ljubljana",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+    if(input.action==="delivery_rules") return json(deliveryRules(today));
     const ime=text(input.ime,100,true);
     const priimek=text(input.priimek,100,true);
     const email=validEmail(input.email);
@@ -37,8 +39,7 @@ Deno.serve(async(req)=>{
         throw new Error("Neveljavna storitev ali stevilo boxov.");
       if(tip==="izposoja"&&![20,40,60,80].includes(n))
         throw new Error("Pri izposoji izberite paket 20, 40, 60 ali 80 boxov.");
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||isNaN(Date.parse(date+"T12:00:00Z"))||new Date(date+"T12:00:00Z").toISOString().slice(0,10)!==date||[0,6].includes(new Date(date+"T12:00:00Z").getUTCDay())||date<new Date().toISOString().slice(0,10)||!/^(10|11|12|13|14):00$/.test(time))
-        throw new Error("Izberite termin dostave.");
+      validateDelivery(date,time,today);
       const occupied=await sb.rpc("zasedeni_termini",{d:date});
       if(occupied.error) throw occupied.error;
       if((occupied.data||[]).some((s:unknown)=>String(s).slice(0,2)===time.slice(0,2)))

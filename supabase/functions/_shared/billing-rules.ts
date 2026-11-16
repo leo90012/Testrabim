@@ -27,12 +27,22 @@ export function text(v:unknown,max:number,required=false):string {
 }
 export function email(v:unknown):string { const s=text(v,254,true).toLowerCase();if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s))throw new Error("E-naslov ni veljaven.");return s; }
 export function minDelivery(today:string):string { let d=today,n=0;while(n<3){d=addDays(d,1);const w=new Date(d+"T12:00:00Z").getUTCDay();if(w!==0&&w!==6)n++;}return d; }
+const DELIVERY_TIMES = ["10:00", "11:00", "12:00", "13:00", "14:00"];
+export function deliveryRules(today:string) {
+  return {minDate:minDelivery(today), maxDate:addDays(today,365), times:DELIVERY_TIMES};
+}
+export function validateDelivery(date:string,time:string,today:string) {
+  const {minDate,maxDate,times}=deliveryRules(today);
+  if(!validDate(date)||date<minDate||date>maxDate||[0,6].includes(new Date(date+"T12:00:00Z").getUTCDay()))
+    throw new Error("Izberite delovni dan od ponedeljka do petka, najmanj 3 delovne dni in največ 365 dni vnaprej.");
+  if(!times.includes(time)) throw new Error("Izberite uro dostave med 10.00 in 14.00.");
+}
 export function validateOrder(raw:any,today:string){
   if(!raw||typeof raw!=="object"||Array.isArray(raw))throw new Error("Manjkajo podatki naročila.");
   const tip=text(raw.tip,20,true),n=raw.st_boxov;
   if(typeof n!=="number")throw new Error("Število boxov mora biti število.");
   const amount=price(tip,n),date=text(raw.datum_dostave,10,true),time=text(raw.cas_dostave,5,true);
-  if(!validDate(date)||date<minDelivery(today)||date>addDays(today,365)||[0,6].includes(new Date(date+"T12:00:00Z").getUTCDay())||!/^(10|11|12|13|14):00$/.test(time))throw new Error("Termin mora biti prost delovni dan vsaj 3 delovne dni vnaprej.");
+  validateDelivery(date,time,today);
   if(raw.obmocje!=="ljubljana")throw new Error("Spletno plačilo je omogočeno za Ljubljano. Za druge kraje oddajte povpraševanje.");
   if(raw.auto_renew_consent!==true||raw.terms_version!==TERMS_VERSION)throw new Error("Potrdite samodejno podaljševanje in bremenitev kartice vsakih 30 dni.");
   const order:Record<string,unknown>={tip,st_boxov:n,email:email(raw.email),datum_dostave:date,cas_dostave:time,paket:(tip==="izposoja"?"Izposoja ":"Skladiščenje ")+n+" boxov",cena_opis:amount.toFixed(2).replace(".",",")+" € / 30 dni",stopnice:false,krhko:false,pomoc_polnjenje:raw.pomoc_polnjenje===true,auto_renew_consent:true,terms_version:TERMS_VERSION};
